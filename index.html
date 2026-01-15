@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulating Statistics</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-color: #2d3436;
+            --accent: #6c5ce7;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header { text-align: center; margin-bottom: 50px; }
+        
+        h1 {
+            font-size: 2.5rem; margin-bottom: 10px;
+            background: linear-gradient(45deg, #0984e3, #6c5ce7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle { color: #636e72; font-size: 1.1rem; max-width: 600px; line-height: 1.6; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 30px;
+            text-decoration: none;
+            color: inherit;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 2px solid transparent;
+            display: flex; flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+            border-color: var(--accent);
+        }
+
+        .icon { font-size: 3rem; margin-bottom: 20px; }
+        .card h2 { margin: 0 0 10px 0; font-size: 1.4rem; }
+        .card p { margin: 0; color: #636e72; font-size: 0.9rem; line-height: 1.5; }
+
+        .tag {
+            display: inline-block; padding: 4px 10px; border-radius: 12px;
+            font-size: 0.7rem; font-weight: 700; color: #2d3436; margin-bottom: 15px;
+            background: #dfe6e9; align-self: flex-start;
+        }
+        
+        .new-badge {
+            position: absolute; top: 15px; right: 15px;
+            background: #ff7675; color: white;
+            font-size: 0.7rem; padding: 4px 8px; border-radius: 10px; font-weight: bold;
+        }
+
+        footer { margin-top: auto; padding-top: 50px; color: #b2bec3; font-size: 0.9rem; }
+/* Coming Soon Card Styling */
+.card.coming-soon {
+    background: rgba(255, 255, 255, 0.5); /* Semi-transparent */
+    border: 2px dashed #b2bec3; /* Dashed grey border */
+    color: #b2bec3; /* Faded text */
+    cursor: default; /* Arrow cursor instead of pointer */
+    box-shadow: none;
+}
+
+.card.coming-soon:hover {
+    transform: none; /* Don't lift up */
+    border-color: #b2bec3;
+    box-shadow: none;
+}
+
+.card.coming-soon .icon {
+    opacity: 0.5;
+    filter: grayscale(100%);
+}
+
+.card.coming-soon .tag {
+    background: #dfe6e9;
+    color: #b2bec3;
+}
+/* Creator Card Styling */
+.creator-section {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin: 60px 0 20px 0;
+}
+
+.creator-card {
+    background: white;
+    padding: 40px;
+    border-radius: 24px;
+    text-align: center;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.05);
+    transition: transform 0.3s ease;
+}
+
+.creator-card:hover {
+    transform: translateY(-5px);
+}
+
+/* Subtle background decoration */
+.creator-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 6px;
+    background: linear-gradient(90deg, #6c5ce7, #0984e3);
+}
+
+.creator-card h3 {
+    margin: 0 0 15px 0;
+    font-size: 1.8rem;
+    color: #2d3436;
+}
+
+.creator-card p {
+    color: #636e72;
+    line-height: 1.6;
+    margin-bottom: 30px;
+    font-size: 1.1rem;
+}
+
+/* The Button */
+.linkedin-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background-color: #0077b5; /* LinkedIn Blue */
+    color: white;
+    padding: 12px 30px;
+    border-radius: 50px;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1rem;
+    transition: all 0.2s;
+    box-shadow: 0 5px 15px rgba(0, 119, 181, 0.3);
+}
+
+.linkedin-btn:hover {
+    background-color: #005e93;
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(0, 119, 181, 0.4);
+}
+
+/* Waving Animation */
+.wave {
+    display: inline-block;
+    animation: wave-animation 2.5s infinite;
+    transform-origin: 70% 70%;
+}
+
+@keyframes wave-animation {
+    0% { transform: rotate( 0.0deg) }
+    10% { transform: rotate(14.0deg) }
+    20% { transform: rotate(-8.0deg) }
+    30% { transform: rotate(14.0deg) }
+    40% { transform: rotate(-4.0deg) }
+    50% { transform: rotate(10.0deg) }
+    60% { transform: rotate( 0.0deg) }
+    100% { transform: rotate( 0.0deg) }
+}
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Simulating Statistics</h1>
+        <p class="subtitle">A repository of interactive experiments exploring probability, chaos, and math.</p>
+    </header>
+
+    <div class="grid">
+        <a href="Birthday Paradox .html" class="card">
+            <span class="tag">Probability</span>
+            <div class="icon">🎂</div>
+            <h2>Birthday Paradox</h2>
+            <p>Why does it only take 23 people to have a 50% chance of a shared birthday?</p>
+        </a>
+
+        <a href="Galton Board.html" class="card">
+            <span class="tag">Statistics</span>
+            <div class="icon">📉</div>
+            <h2>The Galton Board</h2>
+            <p>Watch order emerge from chaos. Balls drop to form a perfect Bell Curve.</p>
+        </a>
+
+        <a href="Monty Hall Problem.html" class="card">
+            <span class="tag">Game Theory</span>
+            <div class="icon">🚪</div>
+            <h2>Monty Hall Problem</h2>
+            <p>Switch or Stay? Prove that switching doubles your odds of winning the car.</p>
+        </a>
+
+        <a href="Chaos Game (Fractals).html" class="card">
+            <span class="tag">Fractals</span>
+            <div class="icon">🔺</div>
+            <h2>The Chaos Game</h2>
+            <p>Generating the Sierpinski Triangle using nothing but random points.</p>
+        </a>
+
+        <a href="pi by pins.html" class="card">
+            <span class="tag">Estimation</span>
+            <div class="icon">📏</div>
+            <h2>Buffon's Needle</h2>
+            <p>Calculating the value of Pi (&pi;) by dropping sticks on the floor.</p>
+        </a>
+
+        <a href="Game of Life by John Conway.html" class="card">
+            <div class="new-badge">NEW</div>
+            <span class="tag">Emergence</span>
+            <div class="icon">🦠</div>
+            <h2>John Conway's Game of Life</h2>
+            <p>Conway's Zero-Player Game. Watch complex life evolve from simple rules.</p>
+        </a>
+<a href="CoinToss.html" class="card">
+    <div class="new-badge">NEW</div>
+    <span class="tag">Law of Large Numbers</span>
+    <div class="icon">🪙</div>
+    <h2>Coin Toss Sim</h2>
+    <p>Watch a jagged graph flatten into a perfect 50% line as you flip thousands of coins.</p>
+</a>
+<a href="Dice that don't gamble (I hope).html" class="card">
+    <div class="new-badge">NEW</div>
+    <span class="tag">Distributions</span>
+    <div class="icon">🎲</div>
+    <h2>Dice Distribution</h2>
+    <p>Visualize the Central Limit Theorem. Roll some dice and watch the Bell Curve appear.</p>
+</a>
+<a href="Random Walk(Diffusion).html" class="card">
+    <div class="new-badge">NEW</div>
+    <span class="tag">Stochastic Process</span>
+    <div class="icon">🕸️</div>
+    <h2>Random Walk</h2>
+    <p>The "Drunkard's Walk." Watch a single path meander, or simulated diffusion with 50 particles.</p>
+</a>
+<a href="Simple Random Walk.html" class="card">
+    <div class="new-badge">NEW</div>
+    <span class="tag">Stochastic Process</span>
+    <div class="icon">🚶</div>
+    <h2>Simple Random Walk</h2>
+    <p>The kind I learnt while studying Actuarial Science.</p>
+</a>
+<a href="Markov Chains.html" class="card">
+    <div class="new-badge">NEW</div>
+    <span class="tag">Actuarial Science</span>
+    <div class="icon">⛅</div>
+    <h2>Markov Chain</h2>
+    <p>The Weather Game. Simulate transitions between states and find the Stationary Distribution.</p>
+</a>
+<div class="card coming-soon">
+    <span class="tag">Planned</span>
+    <div class="icon">🚧</div>
+    <h2>More Coming Soon</h2>
+    <p>Exploring Bayes' Theorem, Poisson Processes, and more statistical magic.</p>
+</div>
+</div>
+<div class="creator-section">
+    <div class="creator-card">
+        <h3>From the Creator <span class="wave">👋</span></h3>
+        <p>
+            Hi, I'm <strong>Jenish</strong>. I'm building this interactive portfolio to bring 
+           statistical concepts to life. If you have any feedback, 
+            I'd love to hear!
+        </p>
+        <a href="https://www.linkedin.com/in/jenish-chaplot" target="_blank" class="linkedin-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+            </svg>
+            Connect on LinkedIn
+        </a>
+    </div>
+</div>
+    <footer>
+        © 2026 Jenish • Simulating Statistics - Made using Gemini and ChatGPT 
+    </footer>
+
+</body>
+</html>
