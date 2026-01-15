@@ -5,25 +5,73 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simulating Statistics</title>
     <style>
-        :root {
-            --bg-color: #f0f2f5;
-            --card-bg: #ffffff;
-            --text-color: #2d3436;
-            --accent: #6c5ce7;
-        }
+      /* 1. DEFINE COLOR VARIABLES */
+:root {
+    /* Light Mode (Default) */
+    --bg-color: #f8f9fa;
+    --text-color: #2d3436;
+    --card-bg: #ffffff;
+    --accent: #0984e3; /* Blue */
+    --border-color: rgba(0,0,0,0.1);
+    --shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 40px 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-        }
+/* Dark Mode Overrides */
+[data-theme="dark"] {
+    --bg-color: #222f3e;
+    --text-color: #dfe6e9;
+    --card-bg: #2d3436;
+    --accent: #74b9ff; /* Lighter Blue for contrast */
+    --border-color: rgba(255,255,255,0.1);
+    --shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
 
+/* 2. APPLY VARIABLES TO BASE STYLES */
+body {
+    margin: 0;
+    padding: 40px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color); /* Use the variable */
+    color: var(--text-color);          /* Use the variable */
+    text-align: center;
+    transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition */
+}
+
+/* Update your card styles to use variables too! */
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    /* ... other styles remain the same ... */
+}
+
+.card h2 { color: var(--text-color); }
+.card p { color: var(--text-color); opacity: 0.8; }
+
+/* THEME TOGGLE BUTTON STYLES */
+.theme-toggle-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+    z-index: 100; /* Ensure it's on top */
+}
+
+.theme-toggle-btn:hover {
+    transform: scale(1.1);
+}
         header { text-align: center; margin-bottom: 50px; }
         
         h1 {
@@ -191,6 +239,7 @@
     100% { transform: rotate( 0.0deg) }
 }
     </style>
+    <link rel="icon" href="favicon.ico">
 </head>
 <body>
 
@@ -198,7 +247,10 @@
         <h1>Simulating Statistics</h1>
         <p class="subtitle">A repository of interactive experiments exploring probability, chaos, and math.</p>
     </header>
+<button class="theme-toggle-btn" id="themeToggle" aria-label="Toggle Dark Mode">
+    ☀️ </button>
 
+<h1>Simulating Statistics</h1>
     <div class="grid">
         <a href="simulations/Birthday Paradox .html" class="card">
             <span class="tag">Probability</span>
@@ -307,5 +359,6 @@
 </body>
 
 </html>
+
 
 
