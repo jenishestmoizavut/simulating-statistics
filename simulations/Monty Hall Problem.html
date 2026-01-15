@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monty Hall Sim</title>
+    <style>
+        :root {
+            --bg-color: #222f3e;
+            --door-color: #ff9f43;
+            --door-hover: #ffb166;
+            --accent: #48dbfb;
+            --text-color: #c8d6e5;
+            --container-bg: #151b23;
+            --success: #1dd1a1;
+            --danger: #ff6b6b;
+            --info: #54a0ff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
+        p.subtitle { color: #8395a7; margin-top: 0; margin-bottom: 30px; }
+
+        /* --- GAME AREA --- */
+        .game-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 40px;
+            perspective: 1000px;
+        }
+
+        .door-wrapper {
+            position: relative;
+            width: 100px;
+            height: 150px;
+            cursor: pointer;
+        }
+
+        .door {
+            width: 100%;
+            height: 100%;
+            background-color: var(--door-color);
+            border-radius: 8px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 2;
+            transition: transform 0.6s ease-in-out, background-color 0.2s;
+            transform-origin: left;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: rgba(0,0,0,0.2);
+            font-weight: bold;
+            border: 4px solid #e58e26;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .door-wrapper:hover .door { background-color: var(--door-hover); }
+        .door-wrapper.selected .door { border-color: var(--accent); box-shadow: 0 0 20px var(--accent); }
+        .door-wrapper.open .door { transform: rotateY(-110deg); }
+
+        .prize {
+            width: 100%;
+            height: 100%;
+            background-color: #2d3436;
+            border-radius: 8px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* --- CONTROLS --- */
+        .message-box {
+            height: 40px;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--accent);
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        button {
+            padding: 10px 25px;
+            border-radius: 25px;
+            border: none;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s;
+            background: #576574;
+            color: white;
+        }
+        
+        button:active { transform: scale(0.95); }
+        button.choice { background-color: var(--accent); color: #222f3e; display: none; }
+        
+        button.info { 
+            background-color: var(--info); 
+            border-radius: 50%; 
+            width: 40px; 
+            height: 40px; 
+            padding: 0; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 1.2rem; 
+            font-weight: bold; 
+        }
+
+        /* --- STATS --- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            background: var(--container-bg);
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid #576574;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .stat-card { text-align: center; }
+        .stat-card h3 { margin: 0 0 5px 0; font-size: 0.9rem; color: #8395a7; }
+        .stat-card .rate { font-size: 1.5rem; font-weight: 700; }
+        .stat-card .count { font-size: 0.8rem; color: #576574; }
+        .stay-text { color: var(--danger); }
+        .switch-text { color: var(--success); }
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .modal-card {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            transform: translateY(20px);
+            transition: transform 0.3s;
+            text-align: left;
+            color: #2d3436;
+        }
+
+        .modal-overlay.active .modal-card { transform: translateY(0); }
+        .modal-card h2 { margin-top: 0; color: #222f3e; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
+        .modal-card h3 { margin-bottom: 10px; color: var(--info); margin-top: 25px; font-size: 1.1rem; }
+        .modal-card h3:first-of-type { margin-top: 0; }
+        .modal-card p { line-height: 1.6; color: #636e72; margin-top: 5px; margin-bottom: 10px; }
+        .modal-card ul { margin: 10px 0; padding-left: 20px; }
+        .modal-card li { line-height: 1.6; color: #636e72; margin-bottom: 8px; }
+        .modal-card .highlight { background: #dfe6e9; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #2d3436; }
+        .close-btn { margin-top: 20px; width: 100%; background: #222f3e; }
+    </style>
+</head>
+<body>
+
+    <h1>Monty Hall Simulator</h1>
+    <p class="subtitle">Should you Switch or Stay?</p>
+
+    <div class="message-box" id="msg">Pick a door to start!</div>
+
+    <div class="game-container">
+        <div class="door-wrapper" id="door0" onclick="pickDoor(0)">
+            <div class="door">1</div>
+            <div class="prize" id="prize0">🐐</div>
+        </div>
+        <div class="door-wrapper" id="door1" onclick="pickDoor(1)">
+            <div class="door">2</div>
+            <div class="prize" id="prize1">🐐</div>
+        </div>
+        <div class="door-wrapper" id="door2" onclick="pickDoor(2)">
+            <div class="door">3</div>
+            <div class="prize" id="prize2">🐐</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="btnStay" class="choice" onclick="makeDecision(false)">Stay</button>
+        <button id="btnSwitch" class="choice" onclick="makeDecision(true)">Switch!</button>
+        <button id="btnReset" onclick="resetGame()" style="display:none">Play Again</button>
+        <button class="info" onclick="toggleModal()">?</button>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Win Rate (Stay)</h3>
+            <div class="rate stay-text" id="stayRate">0%</div>
+            <div class="count" id="stayCount">0/0 Wins</div>
+        </div>
+        <div class="stat-card">
+            <h3>Win Rate (Switch)</h3>
+            <div class="rate switch-text" id="switchRate">0%</div>
+            <div class="count" id="switchCount">0/0 Wins</div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal">
+        <div class="modal-card">
+            <h2>The Paradox Explained</h2>
+            <p>The Monty Hall problem is famous because it creates a conflict between your intuition and actual math.</p>
+
+            <h3>1. The Setup (The Game Show)</h3>
+            <p>Imagine you are on a game show. There are <strong>3 closed doors</strong> in front of you:</p>
+            <ul>
+                <li>Behind <strong>one</strong> door is a brand new <strong>Car</strong> 🚗.</li>
+                <li>Behind the <strong>other two</strong> are <strong>Goats</strong> 🐐.</li>
+            </ul>
+
+            <h3>2. The Rules</h3>
+            <ul>
+                <li><strong>You Pick:</strong> You point to a door (e.g., Door 1).</li>
+                <li><strong>Monty Reveals:</strong> The host (who knows the truth) opens one of the <em>other</em> doors to show a Goat.</li>
+                <li><span class="highlight">Crucial Rule:</span> Monty will <strong>never</strong> open your door, and he will <strong>never</strong> open the Car door.</li>
+                <li><strong>The Choice:</strong> He asks: "Do you want to switch or stay?"</li>
+            </ul>
+
+            <h3>3. The "Problem"</h3>
+            <p><strong>Your Brain Says:</strong> "Two doors left. One car, one goat. It's a 50/50 coin flip. Why switch?"</p>
+            <p><strong>The Reality:</strong> It is <span class="highlight">NOT 50/50</span>. The game is rigged so the "Other Door" is <strong>twice as likely</strong> to have the car.</p>
+
+            <h3>4. Why isn't it 50/50?</h3>
+            <p>Monty didn't pick randomly. He <strong>filtered</strong> the choices.</p>
+            <ul>
+                <li><strong>Your Door (1/3 chance):</strong> This represents your guess when you knew nothing.</li>
+                <li><strong>The "Other" Doors (2/3 chance):</strong> Monty eliminated the bad option from this group. The entire 2/3 chance concentrates on the <strong>one remaining door</strong>.</li>
+            </ul>
+<p>Generated by Gemini</p>
+            <button class="close-btn" onclick="toggleModal()">Got it!</button>
+        </div>
+    </div>
+
+    <script>
+        // Game State
+        let carLocation = 0;
+        let pickedDoor = -1;
+        let openedDoor = -1;
+        let gameState = 'PICK'; // PICK, DECIDE, REVEAL
+
+        // Stats
+        let stayWins = 0, stayTotal = 0;
+        let switchWins = 0, switchTotal = 0;
+
+        function init() {
+            resetGame();
+        }
+
+        function resetGame() {
+            gameState = 'PICK';
+            pickedDoor = -1;
+            openedDoor = -1;
+            // FIXED: Added the missing '*' here
+            carLocation = Math.floor(Math.random() * 3);
+
+            document.getElementById('msg').innerText = "Pick a door to start!";
+            document.getElementById('btnReset').style.display = 'none';
+            document.getElementById('btnStay').style.display = 'none';
+            document.getElementById('btnSwitch').style.display = 'none';
+
+            for(let i=0; i<3; i++) {
+                const dw = document.getElementById(`door${i}`);
+                dw.classList.remove('open', 'selected');
+                dw.onclick = () => pickDoor(i);
+                
+                const prize = document.getElementById(`prize${i}`);
+                prize.innerText = (i === carLocation) ? "🚗" : "🐐";
+            }
+        }
+
+        function pickDoor(doorIndex) {
+            if (gameState !== 'PICK') return;
+
+            pickedDoor = doorIndex;
+            document.getElementById(`door${doorIndex}`).classList.add('selected');
+            
+            let options = [0, 1, 2].filter(d => d !== pickedDoor && d !== carLocation);
+            openedDoor = options[Math.floor(Math.random() * options.length)];
+
+            setTimeout(() => {
+                document.getElementById(`door${openedDoor}`).classList.add('open');
+                gameState = 'DECIDE';
+                document.getElementById('msg').innerText = `Monty opened Door ${openedDoor+1}. Switch or Stay?`;
+                document.getElementById('btnStay').style.display = 'block';
+                document.getElementById('btnSwitch').style.display = 'block';
+            }, 500);
+        }
+
+        function makeDecision(didSwitch) {
+            if (gameState !== 'DECIDE') return;
+
+            let finalDoor = pickedDoor;
+            if (didSwitch) {
+                finalDoor = [0, 1, 2].find(d => d !== pickedDoor && d !== openedDoor);
+            }
+
+            for(let i=0; i<3; i++) {
+                document.getElementById(`door${i}`).classList.add('open');
+            }
+
+            const win = (finalDoor === carLocation);
+            
+            if (win) {
+                document.getElementById('msg').innerText = didSwitch ? "SWITCHED & WON! 🚗" : "STAYED & WON! 🚗";
+                document.getElementById('msg').style.color = "#1dd1a1";
+            } else {
+                document.getElementById('msg').innerText = "GOT THE GOAT 🐐";
+                document.getElementById('msg').style.color = "#ff6b6b";
+            }
+
+            if (didSwitch) {
+                switchTotal++;
+                if (win) switchWins++;
+            } else {
+                stayTotal++;
+                if (win) stayWins++;
+            }
+            updateStats();
+
+            document.getElementById('btnStay').style.display = 'none';
+            document.getElementById('btnSwitch').style.display = 'none';
+            document.getElementById('btnReset').style.display = 'block';
+            gameState = 'REVEAL';
+        }
+
+        function updateStats() {
+            const stayPct = stayTotal === 0 ? 0 : ((stayWins/stayTotal)*100).toFixed(1);
+            const switchPct = switchTotal === 0 ? 0 : ((switchWins/switchTotal)*100).toFixed(1);
+
+            document.getElementById('stayRate').innerText = stayPct + "%";
+            document.getElementById('stayCount').innerText = `${stayWins}/${stayTotal} Wins`;
+
+            document.getElementById('switchRate').innerText = switchPct + "%";
+            document.getElementById('switchCount').innerText = `${switchWins}/${switchTotal} Wins`;
+        }
+
+        function toggleModal() {
+            const modal = document.getElementById('modal');
+            modal.classList.toggle('active');
+        }
+        
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) { toggleModal(); }
+        });
+
+        init();
+    </script>
+
+</body>
+</html>

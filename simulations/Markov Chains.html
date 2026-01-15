@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markov Chain Simulator</title>
+    <style>
+        :root {
+            /* Dynamic Colors based on preset */
+            --bg-color: #f1c40f; 
+            --text-color: #ecf0f1;
+            --container-bg: rgba(0, 0, 0, 0.4);
+            --accent: #e67e22;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            transition: background-color 0.5s ease;
+        }
+
+        h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        p.subtitle { margin-top: 0; margin-bottom: 25px; opacity: 0.9; }
+
+        .main-stage {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        /* Icon Animation */
+        .icon-display {
+            font-size: 5rem;
+            animation: float 3s ease-in-out infinite;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+            height: 100px; display: flex; align-items: center;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        /* Transition Diagram */
+        .diagram-container {
+            display: flex;
+            gap: 30px;
+            background: var(--container-bg);
+            padding: 20px 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(5px);
+            align-items: center;
+        }
+        
+        .state-box {
+            text-align: center;
+            opacity: 0.4;
+            transition: all 0.2s;
+            transform: scale(0.9);
+            min-width: 100px;
+        }
+        .state-box.active {
+            opacity: 1;
+            transform: scale(1.1);
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        .state-name { font-size: 1.2rem; margin-bottom: 5px; }
+        .arrow-label { font-size: 0.75rem; color: rgba(255,255,255,0.8); margin-top: 2px; }
+
+        /* Stats Bars */
+        .stats-container {
+            width: 100%; max-width: 600px;
+            background: var(--container-bg);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(5px);
+            margin-bottom: 20px;
+        }
+
+        .bar-group { margin-bottom: 15px; }
+        .bar-label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; font-weight: bold; }
+        
+        .progress-bg {
+            width: 100%; height: 24px; background: rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden; position: relative;
+        }
+        .progress-fill {
+            height: 100%; width: 0%; transition: width 0.1s;
+        }
+        /* Markers for Theoretical Stationary Distribution */
+        .marker {
+            position: absolute; top: 0; bottom: 0; width: 4px; background: rgba(255,255,255,0.8);
+            z-index: 10; box-shadow: 0 0 5px black;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;
+            background: rgba(0,0,0,0.3); padding: 15px 25px; border-radius: 50px;
+            align-items: center;
+        }
+
+        button {
+            padding: 10px 25px; border-radius: 25px; border: none; font-weight: 700; cursor: pointer;
+            background: #ecf0f1; color: #2c3e50; transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.95); }
+        button.primary { background: #e67e22; color: white; }
+        button.step { background: #feca57; color: #2c3e50; }
+
+        /* Select Dropdown */
+        select {
+            padding: 10px 15px; border-radius: 20px; border: none;
+            font-weight: bold; cursor: pointer; background: #ecf0f1; color: #2c3e50;
+        }
+
+        input[type=range] { accent-color: #e67e22; cursor: pointer; width: 100px; }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-card {
+            background: white; padding: 30px; border-radius: 20px;
+            max-width: 500px; width: 90%; color: #2d3436;
+        }
+        .close-btn { width: 100%; margin-top: 20px; background: #2c3e50; color: white; }
+
+    </style>
+</head>
+<body>
+
+    <h1>Markov Chain</h1>
+    <p class="subtitle">Exploring Stationarity</p>
+
+    <div style="margin-bottom: 20px;">
+        <select id="presetSelect" onchange="changePreset()">
+            <option value="weather">Scenario: Weather (Balanced)</option>
+            <option value="brand">Scenario: Brand Loyalty (Sticky)</option>
+            <option value="habit">Scenario: Bad Habit (Trap)</option>
+        </select>
+    </div>
+<div style="background: rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 10px; font-size: 0.9rem; text-align: center; max-width: 600px; margin-bottom: 20px; border-left: 4px solid #e67e22;">
+    <strong>🎯 Goal:</strong> Reach the "Stationary Distribution" (The White Line).<br>
+    <span style="opacity: 0.8">Switch scenarios and click <strong>Run Fast</strong>. Watch how the colored bars always fight to align perfectly with the white markers, no matter where they start.<br>This is because they are irreducible, aperiodic and have a finite state space!</span>
+</div>
+    <div class="main-stage">
+        <div class="icon-display" id="mainIcon">☀️</div>
+        
+        <div class="diagram-container">
+            <div class="state-box" id="boxA">
+                <div class="state-name" id="nameA">Sunny</div>
+                <div class="arrow-label" id="loopA">Loop: 70%</div>
+                <div class="arrow-label" id="toB">To B: 30%</div>
+            </div>
+            <div style="font-size: 2rem; opacity: 0.5;">⇄</div>
+            <div class="state-box" id="boxB">
+                <div class="state-name" id="nameB">Rainy</div>
+                <div class="arrow-label" id="loopB">Loop: 60%</div>
+                <div class="arrow-label" id="toA">To A: 40%</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-container">
+        <div style="text-align: center; margin-bottom: 15px; opacity: 0.8; font-family: monospace;">
+            Step: <span id="stepEl">0</span>
+        </div>
+        
+        <div class="bar-group">
+            <div class="bar-label"><span id="labelA">Sunny</span> <span id="pctA">0%</span></div>
+            <div class="progress-bg">
+                <div class="progress-fill" id="barA" style="background: #f1c40f;"></div>
+                <div class="marker" id="markA" title="Theoretical Stationary Point"></div>
+            </div>
+        </div>
+        
+        <div class="bar-group">
+            <div class="bar-label"><span id="labelB">Rainy</span> <span id="pctB">0%</span></div>
+            <div class="progress-bg">
+                <div class="progress-fill" id="barB" style="background: #3498db;"></div>
+                <div class="marker" id="markB" title="Theoretical Stationary Point"></div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; font-size: 0.8rem; opacity: 0.6; margin-top: 5px;">
+            White line = Theoretical Limit (Stationarity)
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="step" onclick="stepManual()">+1 Step</button>
+        <button id="btnStart" class="primary" onclick="toggleSim()">Run Fast</button>
+        
+        <div style="display:flex; flex-direction: column; align-items:center; margin: 0 10px;">
+            <span style="font-size:0.6rem; font-weight:bold; margin-bottom: 2px;">SPEED</span>
+            <input type="range" id="speedRange" min="1" max="100" value="10">
+        </div>
+
+        <button onclick="resetSim()">Reset</button>
+        <button onclick="toggleModal()">?</button>
+    </div>
+
+    <div class="modal-overlay" id="modal">
+        <div class="modal-card">
+            <h2>Understanding Stationarity</h2>
+            <p>A Markov Chain has a "Stationary Distribution"—a specific percentage it will settle at in the long run.</p>
+            
+            <h3>The Scenarios:</h3>
+            <ul>
+                <li><strong>Weather:</strong> Standard switching. Settles around 57% / 43%.</li>
+                <li><strong>Brand Loyalty:</strong> People stick to their favorite brand (90% retention). Highly skewed stationarity.</li>
+                <li><strong>Bad Habit:</strong> Easy to start (50%), hard to quit (90% stay). Creates a "Trap" state.</li>
+            </ul>
+
+            <p><strong>Look for the white line</strong> on the bars. That is the mathematical prediction. Watch how the colored bars converge to it!</p>
+            <button class="close-btn" onclick="toggleModal()">Got it!</button>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const mainIcon = document.getElementById('mainIcon');
+        const boxA = document.getElementById('boxA');
+        const boxB = document.getElementById('boxB');
+        const nameA = document.getElementById('nameA');
+        const nameB = document.getElementById('nameB');
+        const loopA = document.getElementById('loopA');
+        const loopB = document.getElementById('loopB');
+        const toB = document.getElementById('toB');
+        const toA = document.getElementById('toA');
+        
+        const stepEl = document.getElementById('stepEl');
+        const labelA = document.getElementById('labelA');
+        const labelB = document.getElementById('labelB');
+        const pctA = document.getElementById('pctA');
+        const pctB = document.getElementById('pctB');
+        const barA = document.getElementById('barA');
+        const barB = document.getElementById('barB');
+        const markA = document.getElementById('markA');
+        const markB = document.getElementById('markB');
+        
+        const speedRange = document.getElementById('speedRange');
+        const presetSelect = document.getElementById('presetSelect');
+
+        // Logic Variables
+        let isRunning = false;
+        let animationFrame;
+        let currentState = 0; // 0 = A, 1 = B
+        
+        let totalSteps = 0;
+        let countA = 0;
+        let countB = 0;
+
+        // Current Config (Default: Weather)
+        let config = {
+            name: "weather",
+            labels: ["Sunny", "Rainy"],
+            icons: ["☀️", "🌧️"],
+            colors: ["#f1c40f", "#3498db"], // Bar colors
+            bgColors: ["#f1c40f", "#2c3e50"], // Background transition colors
+            // Transition Matrix: 
+            // P[0][0] (A->A), P[0][1] (A->B)
+            // P[1][0] (B->A), P[1][1] (B->B)
+            probs: [
+                [0.7, 0.3], 
+                [0.4, 0.6]  
+            ],
+            stationary: [57.1, 42.9] // Pre-calculated for visuals
+        };
+
+        // PRESETS DATABASE
+        const presets = {
+            weather: {
+                labels: ["Sunny", "Rainy"],
+                icons: ["☀️", "🌧️"],
+                colors: ["#f1c40f", "#3498db"],
+                bgColors: ["#f1c40f", "#2c3e50"],
+                probs: [[0.7, 0.3], [0.4, 0.6]],
+                stationary: [57.1, 42.9]
+            },
+            brand: {
+                labels: ["Brand A", "Brand B"],
+                icons: ["🅰️", "🅱️"],
+                colors: ["#e74c3c", "#8e44ad"],
+                bgColors: ["#c0392b", "#8e44ad"],
+                // Strong loyalty: 90% chance to stay
+                probs: [[0.9, 0.1], [0.1, 0.9]], 
+                stationary: [50.0, 50.0]
+            },
+            habit: {
+                labels: ["Healthy", "Habit"],
+                icons: ["🥗", "🚬"],
+                colors: ["#2ecc71", "#7f8c8d"],
+                bgColors: ["#27ae60", "#7f8c8d"],
+                // Easy to start (50% from Healthy->Habit)
+                // Hard to quit (90% stay in Habit)
+                probs: [[0.5, 0.5], [0.1, 0.9]], 
+                stationary: [16.7, 83.3] // Heavy skew to Habit
+            }
+        };
+
+        function init() {
+            changePreset();
+        }
+
+        function changePreset() {
+            const key = presetSelect.value;
+            config = presets[key];
+            
+            // Update Text Labels
+            nameA.innerText = config.labels[0];
+            nameB.innerText = config.labels[1];
+            labelA.innerText = config.labels[0];
+            labelB.innerText = config.labels[1];
+            
+            // Update Prob Labels
+            loopA.innerText = `Loop: ${(config.probs[0][0]*100).toFixed(0)}%`;
+            toB.innerText = `To B: ${(config.probs[0][1]*100).toFixed(0)}%`;
+            loopB.innerText = `Loop: ${(config.probs[1][1]*100).toFixed(0)}%`;
+            toA.innerText = `To A: ${(config.probs[1][0]*100).toFixed(0)}%`;
+
+            // Update Bar Colors
+            barA.style.background = config.colors[0];
+            barB.style.background = config.colors[1];
+
+            // Set Theoretical Markers
+            markA.style.left = config.stationary[0] + "%";
+            markB.style.left = config.stationary[1] + "%";
+
+            resetSim();
+        }
+
+        function updateUI() {
+            // Icon & Background
+            mainIcon.innerText = config.icons[currentState];
+            document.body.style.backgroundColor = config.bgColors[currentState];
+            
+            // Diagram Highlight
+            if (currentState === 0) {
+                boxA.classList.add('active');
+                boxB.classList.remove('active');
+            } else {
+                boxA.classList.remove('active');
+                boxB.classList.add('active');
+            }
+
+            // Stats
+            stepEl.innerText = totalSteps.toLocaleString();
+            
+            if (totalSteps > 0) {
+                const pA = (countA / totalSteps * 100).toFixed(1);
+                const pB = (countB / totalSteps * 100).toFixed(1);
+                
+                pctA.innerText = pA + "%";
+                barA.style.width = pA + "%";
+                
+                pctB.innerText = pB + "%";
+                barB.style.width = pB + "%";
+            } else {
+                barA.style.width = "0%";
+                barB.style.width = "0%";
+            }
+        }
+
+        function stepLogic() {
+            const r = Math.random();
+            const currentProbs = config.probs[currentState]; // [Stay, Switch]
+            
+            // In my config matrix:
+            // if currentState is 0 (A): [P(A->A), P(A->B)]
+            // if currentState is 1 (B): [P(B->A), P(B->B)] <-- WAIT!
+            // Standard matrix is P_ij. 
+            // Row 0: A->A, A->B. 
+            // Row 1: B->A, B->B.
+            
+            if (currentState === 0) {
+                // We are at A.
+                // Stay at A if r < P(A->A)
+                if (r < currentProbs[0]) {
+                    currentState = 0;
+                } else {
+                    currentState = 1;
+                }
+            } else {
+                // We are at B.
+                // Go to A if r < P(B->A) (Index 0 of row 1)
+                if (r < currentProbs[0]) {
+                    currentState = 0;
+                } else {
+                    currentState = 1;
+                }
+            }
+
+            totalSteps++;
+            if (currentState === 0) countA++;
+            else countB++;
+        }
+
+        function stepManual() {
+            if (isRunning) toggleSim(); // Pause if running
+            stepLogic();
+            updateUI();
+        }
+
+        function resetSim() {
+            isRunning = false;
+            cancelAnimationFrame(animationFrame);
+            document.getElementById('btnStart').innerText = "Run Fast";
+            
+            currentState = 0; // Start at A
+            totalSteps = 0;
+            countA = 0;
+            countB = 0;
+            
+            updateUI();
+        }
+
+        function toggleSim() {
+            if (isRunning) {
+                isRunning = false;
+                document.getElementById('btnStart').innerText = "Run Fast";
+            } else {
+                isRunning = true;
+                document.getElementById('btnStart').innerText = "Pause";
+                loop();
+            }
+        }
+
+        function loop() {
+            if (!isRunning) return;
+
+            const speed = parseInt(speedRange.value);
+            // Turbo Mode Logic
+            // If speed is high (>50), we do multiple steps per frame
+            let loops = 1;
+            if (speed > 50) loops = Math.pow(speed - 40, 1.5); 
+            
+            // Slow Mode Logic
+            // If speed is low, we throttle frames (handled simply by loops=1 but fast update)
+            // Ideally we'd use time-delta for slow, but for this "Run Fast" focus, we just blast it.
+
+            for (let i = 0; i < loops; i++) {
+                stepLogic();
+            }
+            
+            updateUI();
+            
+            // Throttle visual updates if super fast to save CPU? 
+            // No need, browser handles it well enough for simple DOM.
+            
+            // Delay for very slow speeds
+            if (speed < 20) {
+                 setTimeout(() => {
+                     if(isRunning) animationFrame = requestAnimationFrame(loop);
+                 }, (20 - speed) * 20);
+            } else {
+                animationFrame = requestAnimationFrame(loop);
+            }
+        }
+
+        function toggleModal() { document.getElementById('modal').classList.toggle('active'); }
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) toggleModal();
+        });
+
+        // Init
+        init();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galton Board Sim</title>
+    <style>
+        :root {
+            --bg-color: #222f3e; /* Clean Dark Blue-Grey */
+            --accent: #48dbfb;   /* Bright Cyan */
+            --danger: #ff6b6b;
+            --secondary: #576574;
+            --text-color: #c8d6e5;
+            --container-bg: #151b23; /* Darker container */
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
+        p.subtitle { color: #8395a7; margin-top: 0; margin-bottom: 25px; font-size: 1.2rem; }
+
+        .controls {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            z-index: 10;
+        }
+
+        button {
+            background-color: var(--accent);
+            color: #222f3e;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-weight: 700;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        
+        button:active { transform: scale(0.95); }
+        
+        button.flood { background-color: #feca57; }
+        button.flood.active { background-color: var(--danger); color: white; }
+        
+        button.secondary { background-color: var(--secondary); color: white; }
+
+        .canvas-container {
+            border: 2px solid #576574;
+            border-radius: 12px;
+            background-color: var(--container-bg);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            padding: 0;
+            line-height: 0; 
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            border-radius: 10px;
+        }
+order {
+display: block;
+font-size: 1.2rem;
+}
+    </style>
+</head>
+<body>
+
+    <h1>The Galton Board</h1>
+    <p class="subtitle"><h2><div id="order">Order from Chaos - The longer you run it, the better it gets ;)</p></h3>
+
+    <div class="controls">
+        <button onclick="spawnBall()">+ Drop 1</button>
+        <button class="flood" onclick="toggleFlood()">🌊 Flood Gates</button>
+        <button class="secondary" onclick="resetBoard()">Reset</button>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="board"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('board');
+        const ctx = canvas.getContext('2d');
+
+        // --- PHYSICS SETTINGS (The "Wide Curve" Logic) ---
+        const rows = 12; 
+        const gravity = 0.25;      
+        const elasticity = 0.3;     
+        const friction = 0.995;     
+        const kickStrength = 1.3;   
+        const randomness = 0.4;     
+        const damping = 0.5;        
+
+        // Layout Variables
+        let width, height;
+        let spacing, pegSize, ballSize;
+        let pegAreaHeight, binAreaHeight, hopperHeight;
+
+        // State
+        let pegs = [];
+        let balls = [];
+        let bins = []; 
+        let floodInterval = null;
+        let maxStackHeight = 0; 
+
+        function init() {
+            const maxWidth = 550; 
+            width = Math.min(window.innerWidth - 30, maxWidth);
+            
+            // Spacing
+            spacing = width / (rows + 4); 
+            pegSize = spacing * 0.12; 
+            ballSize = spacing * 0.22; 
+
+            // Sections
+            hopperHeight = spacing * 3; 
+            const triangleHeight = rows * spacing;
+            binAreaHeight = (ballSize * 2) * 15; 
+            pegAreaHeight = hopperHeight + triangleHeight;
+            height = pegAreaHeight + binAreaHeight;
+            
+            if (height > window.innerHeight - 200) {
+                const diff = height - (window.innerHeight - 200);
+                binAreaHeight -= diff;
+                height = pegAreaHeight + binAreaHeight;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            createPegs();
+            createBins();
+            
+            if (!window.animationRunning) {
+                window.animationRunning = true;
+                loop();
+            }
+        }
+
+        function createPegs() {
+            pegs = [];
+            const startY = hopperHeight + (spacing * 0.5); 
+
+            for (let row = 0; row < rows; row++) {
+                const cols = row + 3; 
+                const rowWidth = (cols - 1) * spacing;
+                const startX = (width - rowWidth) / 2;
+
+                for (let col = 0; col < cols; col++) {
+                    pegs.push({
+                        x: startX + col * spacing,
+                        y: startY + row * spacing
+                    });
+                }
+            }
+        }
+
+        function createBins() {
+            const lastRowCols = rows + 2; 
+            bins = new Array(lastRowCols + 2).fill(0);
+            maxStackHeight = 0;
+        }
+
+        function spawnBall() {
+            const randomOffset = (Math.random() - 0.5) * 5; 
+            balls.push({
+                x: width / 2 + randomOffset,
+                y: 10,
+                vx: (Math.random() - 0.5) * 1, 
+                vy: 0,
+                // Clean Flat Colors
+                color: `hsl(${Math.random() * 40 + 190}, 90%, 65%)`, 
+                active: true
+            });
+        }
+
+        function toggleFlood() {
+            const btn = document.querySelector('.flood');
+            if (floodInterval) {
+                clearInterval(floodInterval);
+                floodInterval = null;
+                btn.innerText = "🌊 Flood Gates";
+                btn.classList.remove('active');
+            } else {
+                floodInterval = setInterval(spawnBall, 30); 
+                btn.innerText = "🛑 Stop";
+                btn.classList.add('active');
+            }
+        }
+
+        function resetBoard() {
+            balls = [];
+            bins.fill(0);
+            maxStackHeight = 0;
+            if (floodInterval) toggleFlood();
+            ctx.clearRect(0,0,width,height);
+        }
+
+        function update() {
+            for (let i = balls.length - 1; i >= 0; i--) {
+                let b = balls[i];
+                if (!b.active) continue;
+                
+                b.vy += gravity;
+                b.vx *= friction;
+                b.x += b.vx;
+                b.y += b.vy;
+
+                // Hopper Logic
+                if (b.y < hopperHeight) {
+                    const funnelSlope = 1.5; 
+                    const centerX = width / 2;
+                    const funnelWidthAtY = 15 + (b.y * funnelSlope);
+                    
+                    if (b.x < centerX - funnelWidthAtY) {
+                        b.x = centerX - funnelWidthAtY;
+                        b.vx = Math.abs(b.vx) * 0.5 + 0.8; 
+                    } else if (b.x > centerX + funnelWidthAtY) {
+                        b.x = centerX + funnelWidthAtY;
+                        b.vx = -Math.abs(b.vx) * 0.5 - 0.8; 
+                    }
+                } else {
+                    if (b.x < ballSize) { b.x = ballSize; b.vx *= -0.5; }
+                    else if (b.x > width - ballSize) { b.x = width - ballSize; b.vx *= -0.5; }
+                }
+
+                // Peg Collision
+                for (let peg of pegs) {
+                    const dx = b.x - peg.x;
+                    const dy = b.y - peg.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+
+                    if (dist < pegSize + ballSize) {
+                        const angle = Math.atan2(dy, dx);
+                        const overlap = (pegSize + ballSize) - dist;
+                        b.x += Math.cos(angle) * overlap;
+                        b.y += Math.sin(angle) * overlap;
+
+                        b.vx *= damping; 
+                        let bounceDir = Math.sign(dx);
+                        if (Math.abs(dx) < 0.2) bounceDir = Math.random() > 0.5 ? 1 : -1;
+                        const noise = (Math.random() - 0.5) * randomness;
+                        b.vx += (bounceDir * kickStrength) + noise; 
+                        b.vy *= -elasticity;
+                    }
+                }
+
+                // Bin Logic
+                if (b.y > pegAreaHeight) {
+                    const center = width / 2;
+                    const relativeX = b.x - center;
+                    const binIndex = Math.round(relativeX / spacing) + Math.floor(bins.length / 2);
+                    
+                    if (binIndex >= 0 && binIndex < bins.length) {
+                        bins[binIndex]++;
+                        if (bins[binIndex] > maxStackHeight) maxStackHeight = bins[binIndex];
+                    }
+                    balls.splice(i, 1);
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Draw Funnel (Subtle)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(width, 0);
+            ctx.lineTo(width, hopperHeight);
+            ctx.lineTo(width/2 + 20, hopperHeight); 
+            ctx.lineTo(width, 0); 
+            ctx.moveTo(0, 0);
+            ctx.lineTo(width/2 - 20, hopperHeight); 
+            ctx.lineTo(0, hopperHeight);
+            ctx.fill();
+
+            // 2. Draw Pegs (Clean Grey Dots)
+            ctx.fillStyle = '#8395a7';
+            for (let p of pegs) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, pegSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 3. Draw Bin Guides (Very Faint)
+            ctx.strokeStyle = '#2f3640'; 
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            const center = width / 2;
+            for (let i = 0; i <= bins.length; i++) {
+                const xPos = center + (i - Math.floor(bins.length / 2) - 0.5) * spacing;
+                ctx.moveTo(xPos, pegAreaHeight);
+                ctx.lineTo(xPos, height);
+            }
+            ctx.stroke();
+
+            // 4. Draw Stacks (Flat & Clean)
+            let ySpacing = ballSize * 2;
+            const maxAllowedPixels = height - pegAreaHeight - 5;
+            const currentTallestPixels = maxStackHeight * ySpacing;
+            if (currentTallestPixels > maxAllowedPixels) {
+                ySpacing = maxAllowedPixels / maxStackHeight;
+            }
+
+            for (let i = 0; i < bins.length; i++) {
+                const count = bins[i];
+                if (count === 0) continue;
+                const xPos = center + (i - Math.floor(bins.length / 2)) * spacing;
+                
+                for (let j = 0; j < count; j++) {
+                    const yPos = height - ballSize - (j * ySpacing) - 2; 
+                    
+                    // Simple Color Shift
+                    const hue = 190 + (j * 2); 
+                    ctx.fillStyle = `hsl(${hue}, 80%, 60%)`;
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(xPos, yPos, ballSize, ballSize * (ySpacing/(ballSize*2)), 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Subtle Shine
+                    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                    ctx.beginPath();
+                    ctx.ellipse(xPos - ballSize*0.3, yPos - ballSize*0.3, ballSize/3, ballSize/3, 0, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+
+            // 5. Draw Active Balls
+            for (let b of balls) {
+                ctx.fillStyle = b.color;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, ballSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        init();
+        
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                resetBoard();
+                init();
+            }, 100);
+        });
+
+    </script>
+</body>
+</html>

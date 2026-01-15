@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buffon's Needle Sim</title>
+    <style>
+        :root {
+            --bg-color: #222f3e;
+            --accent: #ff9f43; /* Orange for needles */
+            --line-color: #576574;
+            --text-color: #c8d6e5;
+            --container-bg: #151b23;
+            --success: #1dd1a1;
+            --info: #54a0ff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
+        p.subtitle { color: #8395a7; margin-top: 0; margin-bottom: 25px; }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: rgba(0,0,0,0.2);
+            padding: 10px 20px;
+            border-radius: 50px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 25px;
+            border: none;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s;
+            background: #576574;
+            color: white;
+        }
+        
+        button:active { transform: scale(0.95); }
+        button.primary { background-color: var(--success); color: #222f3e; }
+        button.stop { background-color: #ff6b6b; color: white; }
+        
+        button.info { 
+            background-color: var(--info); 
+            border-radius: 50%; 
+            width: 36px; height: 36px; 
+            padding: 0; display: flex; align-items: center; justify-content: center; 
+            font-size: 1.1rem; font-weight: bold;
+            min-width: auto;
+        }
+
+        /* Speed Slider Styling */
+        .slide-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #8395a7;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 10px;
+            border-left: 1px solid #576574;
+            padding-left: 15px;
+        }
+
+        input[type=range] {
+            accent-color: var(--success);
+            width: 100px;
+            cursor: pointer;
+        }
+
+        .canvas-container {
+            border: 2px solid #576574;
+            border-radius: 12px;
+            background-color: var(--container-bg);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        canvas { display: block; border-radius: 10px; }
+
+        /* Stats Panel */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .stat-card h3 { margin: 0 0 5px 0; font-size: 0.8rem; color: #8395a7; text-transform: uppercase; }
+        .stat-card .value { font-size: 1.4rem; font-weight: bold; font-family: monospace; }
+        
+        .pi-display {
+            color: var(--accent);
+            font-size: 1.8rem !important;
+            transition: color 0.5s;
+        }
+        .pi-display.close { color: #1dd1a1; text-shadow: 0 0 10px rgba(29, 209, 161, 0.4); }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s; backdrop-filter: blur(5px);
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-card {
+            background: white; padding: 30px; border-radius: 20px;
+            max-width: 550px; width: 90%; color: #2d3436;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            transform: translateY(20px); transition: transform 0.3s;
+        }
+        .modal-overlay.active .modal-card { transform: translateY(0); }
+        .modal-card h2 { margin-top: 0; color: #222f3e; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
+        .modal-card p { line-height: 1.6; color: #636e72; }
+        .close-btn { margin-top: 20px; width: 100%; background: #222f3e; }
+
+    </style>
+</head>
+<body>
+
+    <h1>Buffon's Needle</h1>
+    <p class="subtitle">Calculating &pi; by dropping sticks</p>
+
+    <div class="controls">
+        <button onclick="dropNeedle()">+1 Drop</button>
+        <button id="btnStart" class="primary" onclick="toggleSim()">Run Auto</button>
+        
+        <div class="slide-container">
+            <span>SPEED</span>
+            <input type="range" id="speedRange" min="1" max="1000" value="10">
+        </div>
+
+        <button onclick="resetSim()">Reset</button>
+        <button class="info" onclick="toggleModal()">?</button>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Total Drops</h3>
+            <div class="value" id="totalEl">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Crosses</h3>
+            <div class="value" id="crossEl">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Estimated &pi;</h3>
+            <div class="value pi-display" id="piEl">0.0000</div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal">
+        <div class="modal-card">
+            <h2>The Magic of Pi</h2>
+            <p>In the 18th century, Georges-Louis Leclerc, Comte de Buffon, asked a question: <em>"If I drop a needle on a floor made of parallel strips of wood, what is the chance the needle crosses a line?"</em></p>
+            
+            <p>The green lines are 'needles' which intersect on the parallel strips of wood. The brown ones are those which perfectly fit in.</p>
+
+            <p>If the needle length equals the width of the strips, the probability turns out to be exactly:</p>
+            <p style="text-align: center; font-size: 1.2rem; font-weight: bold; color: #54a0ff;">P = 2 / &pi;</p>
+            
+            <p>This means we can calculate Pi by just counting drops!</p>
+            <p style="text-align: center; font-size: 1.2rem; font-weight: bold; color: #1dd1a1;">&pi; &approx; 2 &times; (Total / Crosses)</p>
+            <button class="close-btn" onclick="toggleModal()">Got it!</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const totalEl = document.getElementById('totalEl');
+        const crossEl = document.getElementById('crossEl');
+        const piEl = document.getElementById('piEl');
+        const speedRange = document.getElementById('speedRange');
+
+        // Config
+        let width, height;
+        const lineSpacing = 60; 
+        const needleLength = 60; 
+        
+        let total = 0;
+        let crosses = 0;
+        let isRunning = false;
+        let animationFrame;
+
+        // Keep track of needles
+        let needles = []; 
+
+        function init() {
+            const size = Math.min(window.innerWidth - 40, 600);
+            width = size;
+            height = size;
+            canvas.width = width;
+            canvas.height = height;
+            resetSim();
+        }
+
+        function resetSim() {
+            isRunning = false;
+            cancelAnimationFrame(animationFrame);
+            document.getElementById('btnStart').innerText = "Run Auto";
+            document.getElementById('btnStart').className = "primary";
+            
+            total = 0;
+            crosses = 0;
+            needles = [];
+            
+            updateStats();
+            draw();
+        }
+
+        function drawBackground() {
+            ctx.fillStyle = "#151b23";
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.strokeStyle = "#576574";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let y = 0; y <= height; y += lineSpacing) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+            }
+            ctx.stroke();
+        }
+
+        function drawNeedles() {
+            for (let n of needles) {
+                // Matches your explanation: Green for cross, Brown/Orange for miss
+                ctx.strokeStyle = n.crosses ? "#1dd1a1" : "rgba(255, 159, 67, 0.6)"; 
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(n.x1, n.y1);
+                ctx.lineTo(n.x2, n.y2);
+                ctx.stroke();
+            }
+        }
+
+        function draw() {
+            drawBackground();
+            drawNeedles();
+        }
+
+        function dropNeedle() {
+            // FIXED MATH: Removed +10/-20 padding to allow unbiased drops
+            const x = Math.random() * width;
+            const y = Math.random() * height;
+            
+            const angle = Math.random() * Math.PI;
+
+            const x1 = x - (needleLength / 2) * Math.cos(angle);
+            const y1 = y - (needleLength / 2) * Math.sin(angle);
+            const x2 = x + (needleLength / 2) * Math.cos(angle);
+            const y2 = y + (needleLength / 2) * Math.sin(angle);
+
+            const lineIndex1 = Math.floor(y1 / lineSpacing);
+            const lineIndex2 = Math.floor(y2 / lineSpacing);
+            
+            const isCross = lineIndex1 !== lineIndex2;
+
+            if (isCross) crosses++;
+            total++;
+
+            needles.push({ x1, y1, x2, y2, crosses: isCross });
+            
+            if (needles.length > 2000) needles.shift();
+
+            if (!isRunning) draw(); 
+            updateStats();
+        }
+
+        function updateStats() {
+            totalEl.innerText = total.toLocaleString();
+            crossEl.innerText = crosses.toLocaleString();
+            
+            if (crosses > 0) {
+                const piEst = 2 * (total / crosses);
+                piEl.innerText = piEst.toFixed(5);
+                
+                if (Math.abs(piEst - Math.PI) < 0.001) {
+                    piEl.classList.add('close');
+                } else {
+                    piEl.classList.remove('close');
+                }
+            } else {
+                piEl.innerText = "0.0000";
+            }
+        }
+
+        function toggleSim() {
+            if (isRunning) {
+                isRunning = false;
+                document.getElementById('btnStart').innerText = "Run Auto";
+                document.getElementById('btnStart').className = "primary";
+            } else {
+                isRunning = true;
+                document.getElementById('btnStart').innerText = "Pause";
+                document.getElementById('btnStart').className = "stop";
+                loop();
+            }
+        }
+
+        function loop() {
+            if (!isRunning) return;
+
+            // Use the slider value for drops per frame
+            const dropsPerFrame = parseInt(speedRange.value);
+
+            for(let i=0; i<dropsPerFrame; i++) {
+                dropNeedle();
+            }
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function toggleModal() {
+            document.getElementById('modal').classList.toggle('active');
+        }
+
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) toggleModal();
+        });
+
+        init();
+        window.addEventListener('resize', init);
+
+    </script>
+</body>
+</html>

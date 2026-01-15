@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Walk</title>
+    <style>
+        :root {
+            --bg-color: #222f3e;
+            --accent: #ff9f43; /* Orange */
+            --text-color: #c8d6e5;
+            --container-bg: #151b23;
+            --info: #54a0ff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
+        p.subtitle { color: #8395a7; margin-top: 0; margin-bottom: 25px; }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: rgba(0,0,0,0.2);
+            padding: 10px 20px;
+            border-radius: 50px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 25px;
+            border: none;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s;
+            background: #576574;
+            color: white;
+        }
+        
+        button:active { transform: scale(0.95); }
+        button.primary { background-color: var(--accent); color: #222f3e; }
+        
+        /* Sliders */
+        .slide-group {
+            display: flex; flex-direction: column; align-items: center; margin: 0 10px;
+        }
+        .slide-group label { font-size: 0.7rem; color: #8395a7; font-weight: bold; margin-bottom: 5px; letter-spacing: 1px;}
+        input[type=range] { accent-color: var(--accent); cursor: pointer; }
+
+        .canvas-container {
+            border: 2px solid #576574;
+            border-radius: 12px;
+            background-color: var(--container-bg);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        canvas { display: block; border-radius: 10px; }
+
+        .stats { 
+            margin-top: 15px; font-family: monospace; color: var(--accent); font-size: 1.1rem; 
+            text-align: center;
+        }
+        .stats span { color: white; }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s; backdrop-filter: blur(5px);
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-card {
+            background: white; padding: 30px; border-radius: 20px;
+            max-width: 550px; width: 90%; color: #2d3436;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            transform: translateY(20px); transition: transform 0.3s;
+        }
+        .modal-overlay.active .modal-card { transform: translateY(0); }
+        .modal-card h2 { margin-top: 0; color: #222f3e; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
+        .modal-card p { line-height: 1.6; color: #636e72; }
+        .close-btn { margin-top: 20px; width: 100%; background: #222f3e; }
+
+    </style>
+</head>
+<body>
+
+    <h1>Simple Random Walk</h1>
+    <p class="subtitle">2D Diffusion Simulator</p>
+
+    <div class="canvas-container">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div class="stats">
+        Steps: <span id="stepEl">0</span> | Max Distance: <span id="distEl">0</span>
+    </div>
+
+    <div class="controls">
+        <button id="btnStart" class="primary" onclick="toggleSim()">Run</button>
+        
+        <div class="slide-group">
+            <label>WALKERS: <span id="countVal" style="color:white">1</span></label>
+            <input type="range" id="countRange" min="1" max="100" value="1" oninput="resetSim()">
+        </div>
+
+        <div class="slide-group">
+            <label>SPEED</label>
+            <input type="range" id="speedRange" min="1" max="50" value="10">
+        </div>
+
+        <button onclick="resetSim()">Reset</button>
+        <button style="background: var(--info); border-radius: 50%; width: 36px; padding:0;" onclick="toggleModal()">?</button>
+    </div>
+
+    <div class="modal-overlay" id="modal">
+        <div class="modal-card">
+            <h2>The Drunkard's Walk</h2>
+            <p>Imagine being in the middle of a field and flipping a coin to decide whether to step North, South, East, or West.</p>
+            
+            <h3>Two Ways to Watch:</h3>
+            <ul>
+                <li><strong>1 Walker:</strong> Watch the unique, winding path of a single particle.</li>
+                <li><strong>50 Walkers:</strong> Watch a "Probability Cloud" expand. This simulates <strong>Diffusion</strong> (like perfume spreading in air).</li>
+            </ul>
+
+            <p style="font-size: 0.9rem; color: #8395a7; border-top: 1px solid #eee; padding-top: 10px;">
+                <strong>Math Fact:</strong> The average distance from the center grows by the <em>square root of time</em> ($\sqrt{t}$).
+            </p>
+            <button class="close-btn" onclick="toggleModal()">Got it!</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const stepEl = document.getElementById('stepEl');
+        const distEl = document.getElementById('distEl');
+        const countRange = document.getElementById('countRange');
+        const countVal = document.getElementById('countVal');
+        const speedRange = document.getElementById('speedRange');
+
+        let isRunning = false;
+        let animationFrame;
+        
+        // Simulation State
+        let walkers = [];
+        let steps = 0;
+        const stepSize = 4;
+        
+        // Colors for multiple walkers
+        const colors = ['#ff9f43', '#ee5253', '#0abde3', '#10ac84', '#5f27cd', '#f368e0'];
+
+        class Walker {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.prevX = x;
+                this.prevY = y;
+                // Random color
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.maxDist = 0;
+            }
+
+            update() {
+                this.prevX = this.x;
+                this.prevY = this.y;
+
+                // Pick a direction (0=N, 1=E, 2=S, 3=W)
+                const dir = Math.floor(Math.random() * 4);
+                
+                if (dir === 0) this.y -= stepSize;      // North
+                else if (dir === 1) this.x += stepSize; // East
+                else if (dir === 2) this.y += stepSize; // South
+                else this.x -= stepSize;                // West
+
+                // Calculate distance from center
+                const dx = this.x - canvas.width/2;
+                const dy = this.y - canvas.height/2;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > this.maxDist) this.maxDist = dist;
+            }
+
+            draw() {
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 1;
+                
+                // If many walkers, use transparency to see the "cloud" density
+                if (walkers.length > 10) {
+                    ctx.globalAlpha = 0.4;
+                } else {
+                    ctx.globalAlpha = 1.0;
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(this.prevX, this.prevY);
+                ctx.lineTo(this.x, this.y);
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        function init() {
+            const size = Math.min(window.innerWidth - 40, 600);
+            canvas.width = size;
+            canvas.height = size;
+            resetSim();
+        }
+
+        function resetSim() {
+            isRunning = false;
+            cancelAnimationFrame(animationFrame);
+            document.getElementById('btnStart').innerText = "Run";
+            
+            // Clear Screen
+            ctx.fillStyle = "#151b23";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Reset Stats
+            steps = 0;
+            stepEl.innerText = "0";
+            distEl.innerText = "0";
+
+            // Create Walkers
+            const count = parseInt(countRange.value);
+            countVal.innerText = count;
+            
+            walkers = [];
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            for(let i=0; i<count; i++) {
+                walkers.push(new Walker(centerX, centerY));
+            }
+        }
+
+        function toggleSim() {
+            if (isRunning) {
+                isRunning = false;
+                document.getElementById('btnStart').innerText = "Run";
+            } else {
+                isRunning = true;
+                document.getElementById('btnStart').innerText = "Pause";
+                loop();
+            }
+        }
+
+        function loop() {
+            if (!isRunning) return;
+
+            const speed = parseInt(speedRange.value);
+            const stepsPerFrame = Math.floor(Math.pow(speed, 1.2)); // Non-linear speed up
+
+            for(let i=0; i<stepsPerFrame; i++) {
+                let globalMaxDist = 0;
+
+                walkers.forEach(w => {
+                    w.update();
+                    w.draw();
+                    if (w.maxDist > globalMaxDist) globalMaxDist = w.maxDist;
+                });
+                
+                steps++;
+            }
+            
+            // Update Stats UI (only once per frame)
+            stepEl.innerText = steps.toLocaleString();
+            
+            // Calculate avg max distance just for display
+            let maxD = 0;
+            walkers.forEach(w => { if(w.maxDist > maxD) maxD = w.maxDist; });
+            distEl.innerText = Math.round(maxD) + "px";
+
+            animationFrame = requestAnimationFrame(loop);
+        }
+
+        function toggleModal() { document.getElementById('modal').classList.toggle('active'); }
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) toggleModal();
+        });
+
+        window.addEventListener('resize', init);
+        init();
+
+    </script>
+</body>
+</html>

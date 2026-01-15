@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Law of Large Numbers</title>
+    <style>
+        :root {
+            --bg-color: #222f3e;
+            --accent: #48dbfb; /* Cyan */
+            --accent-glow: rgba(72, 219, 251, 0.4);
+            --target: #ff9f43; /* Orange */
+            --text-color: #c8d6e5;
+            --container-bg: #151b23;
+            --grid-line: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
+        p.subtitle { color: #8395a7; margin-top: 0; margin-bottom: 25px; }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: rgba(0,0,0,0.2);
+            padding: 10px 20px;
+            border-radius: 50px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 25px;
+            border: none;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s;
+            background: #576574;
+            color: white;
+        }
+        
+        button:active { transform: scale(0.95); }
+        button.primary { background-color: var(--accent); color: #222f3e; }
+        
+        button.flip-btn {
+            background-color: #ffffff;
+            color: #2d3436;
+            font-size: 1rem;
+            padding: 10px 30px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        }
+        button.flip-btn:hover { background-color: #ffeaa7; }
+
+        .coin-display {
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            background: #dfe6e9;
+            color: #2d3436;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; font-weight: bold;
+            border: 4px solid #b2bec3;
+            margin-bottom: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            transition: transform 0.1s, background-color 0.2s;
+            cursor: pointer; 
+            user-select: none;
+        }
+        .coin-display:active { transform: scale(0.9); }
+        .coin-display.heads { background: #ffeaa7; border-color: #fdcb6e; }
+        .coin-display.tails { background: #fab1a0; border-color: #e17055; }
+
+        /* Enhanced Chart Container */
+        .chart-container {
+            width: 100%; max-width: 700px;
+            height: 350px; /* Taller for better view */
+            background: var(--container-bg);
+            border: 2px solid #576574;
+            border-radius: 12px;
+            position: relative;
+            margin-bottom: 20px;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.5); /* Inner shadow depth */
+        }
+        canvas { display: block; width: 100%; height: 100%; border-radius: 10px; }
+
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 100%; max-width: 600px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .stat-card h3 { margin: 0 0 5px 0; font-size: 0.8rem; color: #8395a7; text-transform: uppercase; }
+        .stat-card .value { font-size: 1.4rem; font-weight: bold; font-family: monospace; }
+        
+        /* Slider */
+        .slide-container { display: flex; align-items: center; gap: 10px; color: #8395a7; font-size: 0.8rem; font-weight: bold; border-left: 1px solid #576574; padding-left: 15px; margin-left: 10px; }
+        input[type=range] { accent-color: var(--accent); width: 100px; cursor: pointer; }
+        
+        .axis-label { position: absolute; color: #8395a7; font-size: 0.7rem; font-family: monospace;}
+        .axis-y-top { top: 10px; left: 10px; }
+        .axis-y-mid { top: 48%; left: 10px; color: var(--target); font-weight: bold; background: rgba(0,0,0,0.5); padding: 2px 4px; border-radius: 4px; }
+        .axis-y-bot { bottom: 10px; left: 10px; }
+        
+        .axis-x-start { bottom: 10px; left: 10px; }
+        .axis-x-end { bottom: 10px; right: 10px; }
+
+    </style>
+</head>
+<body>
+
+    <h1>Law of Large Numbers</h1>
+    <p class="subtitle">Watch randomness become predictable</p>
+
+    <div class="coin-display" id="coin" onclick="manualFlip()">?</div>
+
+    <div class="chart-container">
+        <canvas id="chart"></canvas>
+        
+        <span class="axis-label axis-y-top">100%</span>
+        <span class="axis-label axis-y-mid">50%</span>
+        <span class="axis-label axis-y-bot">0%</span>
+
+        <span class="axis-label axis-x-end" id="xLabelEnd">0 Flips</span>
+    </div>
+
+    <div class="controls">
+        <button id="btnStart" class="primary" onclick="toggleSim()">Run Auto</button>
+        <div class="slide-container">
+            <span>SPEED</span>
+            <input type="range" id="speedRange" min="1" max="100" value="10">
+        </div>
+        <button onclick="resetSim()">Reset</button>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Total Flips</h3>
+            <div class="value" id="totalEl">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Heads</h3>
+            <div class="value" id="headsEl">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Ratio (Heads %)</h3>
+            <div class="value" id="ratioEl">0.0%</div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('chart');
+        const ctx = canvas.getContext('2d');
+        const coinEl = document.getElementById('coin');
+        const totalEl = document.getElementById('totalEl');
+        const headsEl = document.getElementById('headsEl');
+        const ratioEl = document.getElementById('ratioEl');
+        const xLabelEnd = document.getElementById('xLabelEnd');
+        const speedRange = document.getElementById('speedRange');
+
+        let isRunning = false;
+        let animationFrame;
+        
+        let total = 0;
+        let heads = 0;
+        let history = []; 
+
+        function init() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            resetSim();
+        }
+
+        function resetSim() {
+            isRunning = false;
+            cancelAnimationFrame(animationFrame);
+            document.getElementById('btnStart').innerText = "Run Auto";
+            document.getElementById('btnStart').className = "primary";
+            
+            total = 0;
+            heads = 0;
+            history = [];
+            
+            coinEl.className = "coin-display";
+            coinEl.innerText = "FLIP!";
+            
+            updateStats();
+            drawChart();
+        }
+
+        function manualFlip() {
+            if (isRunning) toggleSim(); 
+            flip(true); 
+            updateStats();
+            drawChart();
+        }
+
+        function flip(forceVisual = false) {
+            const isHeads = Math.random() > 0.5;
+            total++;
+            if (isHeads) heads++;
+            
+            if (forceVisual || parseInt(speedRange.value) < 20) {
+                coinEl.className = isHeads ? "coin-display heads" : "coin-display tails";
+                coinEl.innerText = isHeads ? "H" : "T";
+                coinEl.style.transform = "scale(1.15) rotate(10deg)";
+                setTimeout(() => coinEl.style.transform = "scale(1) rotate(0deg)", 80);
+            }
+
+            // Optimization: Don't grow array indefinitely
+            // If total > 2000, we start decimating (keeping 1 out of every X points)
+            // But for this demo, simple pushing is fine up to ~10k points
+            if (total < 1000 || total % 5 === 0) {
+                history.push(heads / total);
+            }
+        }
+
+        function updateStats() {
+            totalEl.innerText = total.toLocaleString();
+            headsEl.innerText = heads.toLocaleString();
+            xLabelEnd.innerText = total.toLocaleString() + " Flips";
+
+            const ratio = total === 0 ? 0 : (heads / total * 100).toFixed(1);
+            ratioEl.innerText = ratio + "%";
+            
+            const diff = Math.abs((heads/total) - 0.5);
+            if (diff < 0.005) ratioEl.style.color = "#1dd1a1"; 
+            else if (diff < 0.05) ratioEl.style.color = "#48dbfb"; 
+            else ratioEl.style.color = "white";
+        }
+
+        function drawChart() {
+            const width = canvas.width / (window.devicePixelRatio || 1);
+            const height = canvas.height / (window.devicePixelRatio || 1);
+            
+            // Clear and Background
+            ctx.clearRect(0, 0, width, height);
+            
+            // --- GRID LINES ---
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+            ctx.lineWidth = 1;
+            
+            // 25% Line
+            let y25 = height * 0.75;
+            ctx.beginPath(); ctx.moveTo(0, y25); ctx.lineTo(width, y25); ctx.stroke();
+            
+            // 75% Line
+            let y75 = height * 0.25;
+            ctx.beginPath(); ctx.moveTo(0, y75); ctx.lineTo(width, y75); ctx.stroke();
+
+            // --- TARGET LINE (50%) ---
+            const targetY = height / 2;
+            ctx.strokeStyle = "#ff9f43";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 6]); 
+            ctx.beginPath();
+            ctx.moveTo(0, targetY);
+            ctx.lineTo(width, targetY);
+            ctx.stroke();
+
+            // --- DATA LINE ---
+            if (history.length < 2) return;
+
+            // Prepare Path
+            ctx.setLineDash([]);
+            const stepX = width / (history.length - 1);
+            
+            ctx.beginPath();
+            for (let i = 0; i < history.length; i++) {
+                const ratio = history[i];
+                const x = i * stepX;
+                const y = height - (ratio * height);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+
+            // 1. Draw Gradient Fill
+            // We close the path down to the bottom to create a shape
+            ctx.lineTo(width, height);
+            ctx.lineTo(0, height);
+            ctx.closePath();
+
+            // Create Gradient (Cyberpunk Blue -> Transparent)
+            const gradient = ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, "rgba(72, 219, 251, 0.5)"); // Top color (Blue)
+            gradient.addColorStop(1, "rgba(72, 219, 251, 0.0)"); // Bottom color (Transparent)
+            
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // 2. Draw Stroke (The Line itself)
+            // Re-trace just the top line for the stroke
+            ctx.beginPath();
+            for (let i = 0; i < history.length; i++) {
+                const ratio = history[i];
+                const x = i * stepX;
+                const y = height - (ratio * height);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = "#48dbfb";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 3. Draw "Pulse" Dot at the end
+            const lastIndex = history.length - 1;
+            const lastX = lastIndex * stepX;
+            const lastY = height - (history[lastIndex] * height);
+
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.arc(lastX, lastY, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Glow effect for dot
+            ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+            ctx.beginPath();
+            ctx.arc(lastX, lastY, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function toggleSim() {
+            if (isRunning) {
+                isRunning = false;
+                document.getElementById('btnStart').innerText = "Run Auto";
+                document.getElementById('btnStart').className = "primary";
+            } else {
+                isRunning = true;
+                document.getElementById('btnStart').innerText = "Pause";
+                document.getElementById('btnStart').className = "stop"; 
+                loop();
+            }
+        }
+
+        function loop() {
+            if (!isRunning) return;
+
+            const speed = parseInt(speedRange.value);
+            const loops = Math.floor(Math.pow(speed, 1.5)); 
+
+            for (let i = 0; i < loops; i++) {
+                flip();
+            }
+            
+            updateStats();
+            drawChart();
+            animationFrame = requestAnimationFrame(loop);
+        }
+
+        window.addEventListener('resize', init);
+        init();
+
+    </script>
+</body>
+</html>
