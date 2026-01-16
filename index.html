@@ -102,8 +102,9 @@
             font-size: 0.7rem; padding: 4px 8px; border-radius: 10px; font-weight: bold;
         }
 
-        /* --- 4. TOP CORNER CONTROLS --- */
-        /* Brand Corner (Top Left) */
+        /* --- 4. TOP CONTROLS --- */
+        
+        /* Brand Corner (Top Left) - SCROLLS AWAY */
         .brand-corner {
             position: absolute;
             top: 20px;
@@ -112,7 +113,7 @@
             flex-direction: column;
             align-items: flex-start;
             gap: 12px;
-            z-index: 100;
+            z-index: 10;
         }
 
         .brand-link {
@@ -133,17 +134,21 @@
             box-shadow: 0 8px 20px rgba(0,0,0,0.12);
         }
 
-        .brand-logo-img {
-            width: 24px; height: 24px; border-radius: 4px; object-fit: contain;
-        }
+        .brand-logo-img { width: 24px; height: 24px; border-radius: 4px; object-fit: contain; }
         .brand-text { font-size: 0.9rem; font-weight: 700; color: var(--text-color); }
         .brand-sub { font-size: 0.7rem; opacity: 0.6; font-weight: 400; margin-left: 5px; }
 
-        /* Theme Toggle (Top Right) */
-        .theme-toggle-btn {
+        /* Controls Container (Top Right) - FIXED */
+        .controls-container {
             position: fixed;
             top: 20px;
             right: 20px;
+            display: flex;
+            gap: 15px; /* Space between Share and Dark Mode */
+            z-index: 100;
+        }
+
+        .control-btn {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             color: var(--text-color);
@@ -157,9 +162,29 @@
             cursor: pointer;
             box-shadow: var(--shadow);
             transition: all 0.3s ease;
-            z-index: 100;
         }
-        .theme-toggle-btn:hover { transform: scale(1.1); }
+        .control-btn:hover {
+            transform: scale(1.1);
+            border-color: var(--accent);
+        }
+
+        /* Share Tooltip */
+        .share-tooltip {
+            position: absolute;
+            top: 55px;
+            right: 60px; /* Positions it nicely under the buttons */
+            background: #2d3436;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+        }
+        .share-tooltip.show { opacity: 1; }
 
         /* --- 5. SPECIAL CARDS & FOOTER --- */
         .card.coming-soon {
@@ -173,7 +198,6 @@
         .card.coming-soon .icon { opacity: 0.5; filter: grayscale(100%); }
         .card.coming-soon .tag { background: transparent; border: 1px solid var(--border-color); color: var(--footer-color); }
 
-        /* Creator Section */
         .creator-section { width: 100%; display: flex; justify-content: center; margin: 60px 0 20px 0; }
         .creator-card {
             background: var(--card-bg); padding: 40px; border-radius: 24px;
@@ -209,67 +233,13 @@
             60% { transform: rotate( 0.0deg) }
             100% { transform: rotate( 0.0deg) }
         }
-/* --- SHARE BUTTON & TOOLTIP --- */
-.share-container {
-    position: fixed;
-    top: 20px;
-    right: 80px; /* Positioned to the left of the Theme Toggle */
-    z-index: 100;
-}
 
-.share-btn {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
-    width: 45px;
-    height: 45px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    cursor: pointer;
-    box-shadow: var(--shadow);
-    transition: all 0.3s ease;
-}
-
-.share-btn:hover {
-    transform: scale(1.1);
-    background: var(--accent); /* Highlight on hover */
-    color: white;
-    border-color: var(--accent);
-}
-
-/* The "Copied!" Tooltip */
-.share-tooltip {
-    position: absolute;
-    top: 55px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #2d3436;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: bold;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-    white-space: nowrap;
-}
-
-/* Show state */
-.share-tooltip.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(5px);
-}
         footer { margin-top: auto; padding-top: 50px; color: var(--footer-color); font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
     <div class="brand-corner">
-      
         <a href="https://jenishestmoizavut.github.io/attrack/" target="_blank" class="brand-link">
             <img src="attrack-logo.png" alt="Attrack Logo" class="brand-logo-img">
             <div>
@@ -278,16 +248,17 @@
             </div>
         </a>
     </div>
-<div class="share-container">
-    <button class="share-btn" id="shareBtn" aria-label="Share this page">
-        🔗 </button>
-    <div class="share-tooltip" id="shareTooltip">Copied!</div>
-</div>
 
-<button class="theme-toggle-btn" id="themeToggle" ... >
-    <button class="theme-toggle-btn" id="themeToggle" aria-label="Toggle Dark Mode">
-        ☀️
-    </button>
+    <div class="controls-container">
+        <button class="control-btn" id="shareBtn" aria-label="Share">
+            🔗
+        </button>
+        <div class="share-tooltip" id="shareTooltip">Copied!</div>
+
+        <button class="control-btn" id="themeToggle" aria-label="Dark Mode">
+            ☀️
+        </button>
+    </div>
 
     <header>
         <h1>Simulating Statistics</h1>
@@ -327,7 +298,7 @@
             <span class="tag">Estimation</span>
             <div class="icon">📏</div>
             <h2>Buffon's Needle</h2>
-            <p>Calculating the value of Pi (&pi;) by dropping sticks on the floor.</p>
+            <p>Calculating the value of Pi (&pi;) by dropping sticks on a floor.</p>
         </a>
 
         <a href="simulations/Game-of-Life-by-John-Conway.html" class="card">
@@ -409,54 +380,49 @@
 
     <script>
         const themeToggleBtn = document.getElementById('themeToggle');
+        const shareBtn = document.getElementById('shareBtn');
+        const shareTooltip = document.getElementById('shareTooltip');
         const htmlElement = document.documentElement;
 
+        // --- DARK MODE LOGIC ---
         const currentTheme = localStorage.getItem('theme') || 'light';
         htmlElement.setAttribute('data-theme', currentTheme);
         updateIcon(currentTheme);
 
         themeToggleBtn.addEventListener('click', () => {
             let theme = htmlElement.getAttribute('data-theme');
-            if (theme === 'light') { theme = 'dark'; } else { theme = 'light'; }
+            theme = (theme === 'light') ? 'dark' : 'light';
             htmlElement.setAttribute('data-theme', theme);
             localStorage.setItem('theme', theme);
             updateIcon(theme);
         });
 
         function updateIcon(theme) {
-            if (theme === 'dark') { themeToggleBtn.innerText = '🌙'; } 
-            else { themeToggleBtn.innerText = '☀️'; }
+            themeToggleBtn.innerText = (theme === 'dark') ? '🌙' : '☀️';
         }
-      // --- SMART SHARE BUTTON LOGIC ---
-const shareBtn = document.getElementById('shareBtn');
-const shareTooltip = document.getElementById('shareTooltip');
 
-shareBtn.addEventListener('click', async () => {
-    // 1. Try Native Share (Mobile/Modern Browsers)
-    if (navigator.share) {
-        try {
-            await navigator.share({
-                title: 'Simulating Statistics',
-                text: 'Check out these interactive stats simulations!',
-                url: window.location.href
-            });
-            return; // If successful, stop here (don't copy link)
-        } catch (err) {
-            console.log('Share canceled or failed', err);
-        }
-    }
+        // --- SMART SHARE LOGIC ---
+        shareBtn.addEventListener('click', async () => {
+            // 1. Try Native Share (Mobile)
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'Simulating Statistics',
+                        text: 'Check out these interactive stats simulations!',
+                        url: window.location.href
+                    });
+                    return; 
+                } catch (err) {
+                    console.log('Share canceled', err);
+                }
+            }
 
-    // 2. Fallback: Copy to Clipboard (Desktop/Old Browsers)
-    const url = window.location.href;
-    navigator.clipboard.writeText(url).then(() => {
-        shareTooltip.classList.add('show');
-        setTimeout(() => {
-            shareTooltip.classList.remove('show');
-        }, 2000);
-    }).catch(err => console.error('Failed to copy', err));
-});
+            // 2. Fallback: Copy Link (Desktop)
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                shareTooltip.classList.add('show');
+                setTimeout(() => { shareTooltip.classList.remove('show'); }, 2000);
+            }).catch(err => console.error('Failed to copy', err));
+        });
     </script>
 </body>
 </html>
-
-
