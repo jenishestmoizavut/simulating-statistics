@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Buffon's Needle Sim</title>
+    <title>Buffon's Needle Simulator</title>
     <link rel="icon" href="../favicon.ico">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -27,7 +27,7 @@
         }
 
         h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
-        p.subtitle { color: #8395a7; margin-top: 0; margin-bottom: 25px; }
+        .subtitle { color: #8395a7; margin-top: 0; margin-bottom: 25px; }
 
         .controls {
             display: flex; gap: 15px; margin-bottom: 20px;
@@ -39,12 +39,12 @@
         button {
             padding: 10px 20px; border-radius: 25px; border: none;
             font-size: 0.9rem; font-weight: 700; cursor: pointer;
-            transition: transform 0.1s; background: #576574; color: white;
+            transition: all 0.2s; background: #576574; color: white;
         }
         button:active { transform: scale(0.95); }
         button.primary { background-color: var(--success); color: #222f3e; }
         button.stop { background-color: #ff6b6b; color: white; }
-        button.info { background-color: var(--info); border-radius: 50%; width: 36px; height: 36px; padding: 0; }
+        button.info { background-color: var(--info); border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; }
 
         .slide-container {
             display: flex; align-items: center; gap: 10px; color: #8395a7;
@@ -71,31 +71,33 @@
             border-radius: 15px; text-align: center;
             border: 1px solid rgba(255,255,255,0.1);
         }
-        .stat-card h3 { margin: 0 0 5px 0; font-size: 0.8rem; color: #8395a7; }
+        .stat-card h3 { margin: 0 0 5px 0; font-size: 0.8rem; color: #8395a7; text-transform: uppercase; }
         .stat-card .value { font-size: 1.4rem; font-weight: bold; font-family: monospace; }
         
         .pi-display { color: var(--accent); font-size: 1.8rem !important; }
         .pi-display.close { color: #1dd1a1; text-shadow: 0 0 10px rgba(29, 209, 161, 0.4); }
 
-        /* Chart Area */
-        .chart-card { grid-column: span 3; height: 180px; }
+        .chart-card { grid-column: span 3; height: 200px; padding: 20px; }
 
+        /* --- MODAL --- */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center;
-            z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s; backdrop-filter: blur(5px);
+            background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center;
+            z-index: 1000; backdrop-filter: blur(5px);
         }
-        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-overlay.active { display: flex; }
         .modal-card {
             background: white; padding: 30px; border-radius: 20px;
-            max-width: 550px; width: 90%; color: #2d3436;
+            max-width: 500px; width: 90%; color: #2d3436; text-align: center;
         }
+        .modal-card h2 { color: var(--bg-color); margin-top: 0; }
+        .modal-card p { line-height: 1.6; color: #636e72; }
     </style>
 </head>
 <body>
 
     <h1>Buffon's Needle</h1>
-    <p class="subtitle">Estimating &pi; by dropping sticks (Tab-Safe Simulation)</p>
+    <p class="subtitle">Estimating $\pi$ by dropping sticks</p>
 
     <div class="controls">
         <button onclick="manualDrop()">+1 Drop</button>
@@ -125,7 +127,7 @@
             <div class="value" id="crossEl">0</div>
         </div>
         <div class="stat-card">
-            <h3>Estimated &pi;</h3>
+            <h3>Estimated $\pi$</h3>
             <div class="value pi-display" id="piEl">0.0000</div>
         </div>
 
@@ -137,125 +139,69 @@
 
     <div class="modal-overlay" id="modal">
         <div class="modal-card">
-            <h2>The Magic of &pi;</h2>
+            <h2>The Magic of $\pi$</h2>
             
-            <p>This version uses a <strong>Web Worker</strong>. This means the math happens in a background thread, allowing the simulation to continue even if you switch browser tabs.</p>
-            <p style="text-align: center; font-size: 1.2rem; font-weight: bold; color: #1dd1a1;">&pi; &approx; 2 &times; (Total / Crosses)</p>
-            <button class="close-btn" onclick="toggleModal()" style="width:100%; background:#222f3e; color:white; padding:10px; border-radius:20px; border:none; cursor:pointer;">Got it!</button>
+            <p>If you drop a needle of length $l$ onto a floor with parallel lines spaced distance $d$ apart, the probability $P$ that the needle crosses a line is related to $\pi$.</p>
+            <p>When $l = d$, the math is beautiful:</p>
+            <p style="font-size: 1.3rem; font-weight: bold; color: var(--info); margin: 15px 0;">$P = \frac{2}{\pi}$</p>
+            <p>By rearrangeing the formula, we can estimate $\pi$ using our drops:</p>
+            <p style="font-weight: bold; color: var(--success);">$\pi \approx 2 \times \frac{\text{Total Drops}}{\text{Crosses}}$</p>
+            <button onclick="toggleModal()" style="width:100%; margin-top:20px; background:var(--bg-color); color:white; padding:12px; border-radius:25px; border:none; cursor:pointer; font-weight:bold;">I see!</button>
         </div>
     </div>
 
     <script>
-        // --- 1. WEB WORKER LOGIC (Running in Background) ---
+        // --- WORKER SETUP ---
         const workerCode = `
-            let total = 0;
-            let crosses = 0;
-            let isRunning = false;
-            let interval;
-
+            let total = 0, crosses = 0, isRunning = false, interval;
             self.onmessage = function(e) {
                 if (e.data.type === 'START') {
                     isRunning = true;
-                    runLoop(e.data.speed);
-                } else if (e.data.type === 'STOP') {
-                    isRunning = false;
                     clearInterval(interval);
-                } else if (e.data.type === 'RESET') {
-                    total = 0; crosses = 0;
-                } else if (e.data.type === 'MANUAL') {
-                    calculateDrops(1, e.data.width, e.data.height, e.data.lineSpacing, e.data.needleLength);
-                }
+                    interval = setInterval(() => {
+                        if (isRunning) calculate(e.data.speed, 600, 60, 60);
+                    }, 16);
+                } else if (e.data.type === 'STOP') { isRunning = false; clearInterval(interval); }
+                else if (e.data.type === 'RESET') { total = 0; crosses = 0; }
+                else if (e.data.type === 'MANUAL') calculate(1, 600, 60, 60);
             };
-
-            function runLoop(speed) {
-                clearInterval(interval);
-                interval = setInterval(() => {
-                    if (isRunning) {
-                        calculateDrops(speed, 600, 600, 60, 60);
-                    }
-                }, 16); // ~60fps logic
-            }
-
-            function calculateDrops(count, width, height, lineSpacing, needleLength) {
+            function calculate(count, size, spacing, len) {
                 let batch = [];
                 for(let i=0; i<count; i++) {
-                    const x = Math.random() * width;
-                    const y = Math.random() * height;
-                    const angle = Math.random() * Math.PI;
-                    const y1 = y - (needleLength / 2) * Math.sin(angle);
-                    const y2 = y + (needleLength / 2) * Math.sin(angle);
-                    const isCross = Math.floor(y1 / lineSpacing) !== Math.floor(y2 / lineSpacing);
-                    
-                    if (isCross) crosses++;
-                    total++;
-
-                    // Only send needles to UI if batch is small to avoid lag
-                    if (count < 50) {
-                        batch.push({
-                            x1: x - (needleLength / 2) * Math.cos(angle),
-                            y1: y1,
-                            x2: x + (needleLength / 2) * Math.cos(angle),
-                            y2: y2,
-                            crosses: isCross
-                        });
-                    }
+                    const x = Math.random() * size, y = Math.random() * size, angle = Math.random() * Math.PI;
+                    const y1 = y - (len/2)*Math.sin(angle), y2 = y + (len/2)*Math.sin(angle);
+                    const isCross = Math.floor(y1/spacing) !== Math.floor(y2/spacing);
+                    if(isCross) crosses++; total++;
+                    if(count < 50) batch.push({x1: x-(len/2)*Math.cos(angle), y1, x2: x+(len/2)*Math.cos(angle), y2, crosses:isCross});
                 }
                 self.postMessage({ total, crosses, batch });
             }
         `;
-
         const blob = new Blob([workerCode], { type: 'application/javascript' });
         const worker = new Worker(URL.createObjectURL(blob));
 
-        // --- 2. UI & CHARTING ---
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const piChartCtx = document.getElementById('piChart').getContext('2d');
-        let chart;
-        let audioCtx;
-        let isMuted = false;
-        let isRunning = false;
-        let needles = [];
-        const lineSpacing = 60, needleLength = 60;
-        let width, height;
+        // --- UI & CHART ---
+        const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+        let chart, audioCtx, isMuted = false, isRunning = false, needles = [], width = 600, height = 600;
 
         function init() {
             const size = Math.min(window.innerWidth - 40, 600);
-            width = canvas.width = size;
-            height = canvas.height = size;
+            width = canvas.width = height = canvas.height = size;
             initChart();
             resetSim();
         }
 
         function initChart() {
-            chart = new Chart(piChartCtx, {
+            chart = new Chart(document.getElementById('piChart'), {
                 type: 'line',
                 data: {
                     labels: [],
-                    datasets: [{
-                        label: 'Estimate',
-                        data: [],
-                        borderColor: '#ff9f43',
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        fill: false,
-                        tension: 0.2
-                    }, {
-                        label: 'True π',
-                        data: [],
-                        borderColor: 'rgba(255,255,255,0.2)',
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        fill: false
-                    }]
+                    datasets: [{ label: 'Est', data: [], borderColor: '#ff9f43', borderWidth: 2, pointRadius: 0, fill: false },
+                               { label: 'π', data: [], borderColor: 'rgba(255,255,255,0.2)', borderDash:[5,5], pointRadius: 0, fill: false }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: { min: 2.8, max: 3.5, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#8395a7' } },
-                        x: { display: false }
-                    },
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { min: 2.8, max: 3.5, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { display: false } },
                     plugins: { legend: { display: false } }
                 }
             });
@@ -265,18 +211,12 @@
             const { total, crosses, batch } = e.data;
             document.getElementById('totalEl').innerText = total.toLocaleString();
             document.getElementById('crossEl').innerText = crosses.toLocaleString();
-            
             if (crosses > 0) {
-                const piEst = 2 * (total / crosses);
-                document.getElementById('piEl').innerText = piEst.toFixed(5);
-                document.getElementById('piEl').classList.toggle('close', Math.abs(piEst - Math.PI) < 0.01);
-                
-                // Update Chart every 100 drops to keep it smooth
-                if (total % 100 < parseInt(document.getElementById('speedRange').value)) {
-                    updateChart(total, piEst);
-                }
+                const est = 2 * (total / crosses);
+                document.getElementById('piEl').innerText = est.toFixed(5);
+                document.getElementById('piEl').classList.toggle('close', Math.abs(est - Math.PI) < 0.01);
+                if (total % 100 < parseInt(document.getElementById('speedRange').value)) updateChart(total, est);
             }
-
             if (batch.length > 0) {
                 needles = [...needles, ...batch].slice(-1000);
                 draw();
@@ -284,74 +224,44 @@
             }
         };
 
-        function updateChart(total, piEst) {
-            chart.data.labels.push(total);
-            chart.data.datasets[0].data.push(piEst);
-            chart.data.datasets[1].data.push(Math.PI);
-            if (chart.data.labels.length > 50) {
-                chart.data.labels.shift();
-                chart.data.datasets[0].data.shift();
-                chart.data.datasets[1].data.shift();
-            }
+        function updateChart(t, v) {
+            chart.data.labels.push(t); chart.data.datasets[0].data.push(v); chart.data.datasets[1].data.push(Math.PI);
+            if(chart.data.labels.length > 50) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); chart.data.datasets[1].data.shift(); }
             chart.update('none');
-        }
-
-        function manualDrop() {
-            worker.postMessage({ type: 'MANUAL', width, height, lineSpacing, needleLength });
-        }
-
-        function toggleSim() {
-            isRunning = !isRunning;
-            const btn = document.getElementById('btnStart');
-            if (isRunning) {
-                btn.innerText = "Pause";
-                btn.className = "stop";
-                worker.postMessage({ type: 'START', speed: parseInt(document.getElementById('speedRange').value) });
-            } else {
-                btn.innerText = "Run Auto";
-                btn.className = "primary";
-                worker.postMessage({ type: 'STOP' });
-            }
-        }
-
-        function resetSim() {
-            worker.postMessage({ type: 'RESET' });
-            needles = [];
-            chart.data.labels = [];
-            chart.data.datasets[0].data = [];
-            chart.data.datasets[1].data = [];
-            chart.update();
-            draw();
-            document.getElementById('totalEl').innerText = "0";
-            document.getElementById('crossEl').innerText = "0";
-            document.getElementById('piEl').innerText = "0.0000";
         }
 
         function draw() {
             ctx.fillStyle = "#151b23"; ctx.fillRect(0, 0, width, height);
-            ctx.strokeStyle = "#576574"; ctx.lineWidth = 2;
-            ctx.beginPath();
-            for (let y = 0; y <= height; y += lineSpacing) {
-                ctx.moveTo(0, y); ctx.lineTo(width, y);
-            }
+            ctx.strokeStyle = "#576574"; ctx.lineWidth = 1; ctx.beginPath();
+            for (let y = 0; y <= height; y += 60) { ctx.moveTo(0, y); ctx.lineTo(width, y); }
             ctx.stroke();
-
             for (let n of needles) {
                 ctx.strokeStyle = n.crosses ? "#1dd1a1" : "rgba(255, 159, 67, 0.4)";
-                ctx.lineWidth = 2; ctx.beginPath();
-                ctx.moveTo(n.x1, n.y1); ctx.lineTo(n.x2, n.y2); ctx.stroke();
+                ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(n.x1, n.y1); ctx.lineTo(n.x2, n.y2); ctx.stroke();
             }
         }
 
+        function manualDrop() { worker.postMessage({ type: 'MANUAL' }); }
+        function toggleSim() {
+            isRunning = !isRunning;
+            document.getElementById('btnStart').innerText = isRunning ? "Pause" : "Run Auto";
+            document.getElementById('btnStart').className = isRunning ? "stop" : "primary";
+            worker.postMessage({ type: isRunning ? 'START' : 'STOP', speed: parseInt(document.getElementById('speedRange').value) });
+        }
+
+        function resetSim() {
+            worker.postMessage({ type: 'RESET' });
+            needles = []; chart.data.labels = []; chart.data.datasets[0].data = []; chart.data.datasets[1].data = []; chart.update(); draw();
+            document.getElementById('totalEl').innerText = "0"; document.getElementById('crossEl').innerText = "0"; document.getElementById('piEl').innerText = "0.0000";
+        }
+
         function playSound() {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.frequency.setValueAtTime(800 + Math.random() * 200, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+            if (!audioCtx) audioCtx = new AudioContext();
+            const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+            osc.connect(g); g.connect(audioCtx.destination);
+            osc.frequency.setValueAtTime(800 + Math.random()*200, audioCtx.currentTime);
+            g.gain.setValueAtTime(0.02, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.05);
+            osc.start(); osc.stop(audioCtx.currentTime+0.05);
         }
 
         function toggleMute() { isMuted = !isMuted; document.getElementById('muteBtn').innerText = isMuted ? "🔇" : "🔊"; }
