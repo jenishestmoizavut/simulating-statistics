@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dice Distribution<link rel="icon" href="../favicon.ico">
-</title>
+    <title>Dice Distribution</title>
+    <link rel="icon" href="../favicon.ico">
     <style>
         :root {
             --bg-color: #222f3e;
@@ -79,16 +79,17 @@
         }
         canvas { display: block; width: 100%; height: 100%; }
 
-        /* The New Axis Label */
+        /* Axis Labels */
         .axis-title {
             position: absolute;
             bottom: 10px;
+            left: 0;
             width: 100%;
             text-align: center;
             color: #8395a7;
             font-size: 0.9rem;
             font-weight: bold;
-            pointer-events: none; /* Let clicks pass through to canvas if needed */
+            pointer-events: none;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -114,7 +115,6 @@
         .modal-card h2 { margin-top: 0; color: #222f3e; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
         .modal-card p { line-height: 1.6; color: #636e72; }
         .close-btn { margin-top: 20px; width: 100%; background: #222f3e; }
-
     </style>
 </head>
 <body>
@@ -178,7 +178,6 @@
         // Config
         let numDice = 2;
         let totalRolls = 0;
-        
         let counts = {};
 
         function init() {
@@ -210,7 +209,6 @@
             const minSum = numDice;
             const maxSum = numDice * 6;
             
-            // UPDATE THE LABEL DYNAMICALLY
             xAxisLabel.innerText = `Sum of Dice (${minSum} - ${maxSum})`;
 
             for (let i = minSum; i <= maxSum; i++) {
@@ -251,14 +249,40 @@
             const maxSum = numDice * 6;
             const numBars = maxSum - minSum + 1;
             
-            // Increased bottom padding to make room for the label
+            // Layout Configuration
             const paddingBottom = 40; 
-            const paddingX = 20;
+            const paddingLeft = 50; // Extra space for Y-Axis numbers
+            const paddingRight = 20;
             const paddingTop = 20;
 
-            const chartW = width - (paddingX * 2);
+            const chartW = width - (paddingLeft + paddingRight);
             const chartH = height - (paddingBottom + paddingTop);
             
+            // --- DRAW Y-AXIS & GRID ---
+            ctx.textAlign = "right";
+            ctx.textBaseline = "middle";
+            ctx.font = "11px monospace";
+            
+            // Draw 5 grid lines and labels
+            const steps = 5;
+            for(let i = 0; i <= steps; i++) {
+                const ratio = i / steps;
+                const value = Math.round(maxCount * ratio);
+                const yPos = (height - paddingBottom) - (ratio * chartH);
+
+                // Grid line
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.1)"; // Faint line
+                ctx.moveTo(paddingLeft, yPos);
+                ctx.lineTo(width - paddingRight, yPos);
+                ctx.stroke();
+
+                // Number Label
+                ctx.fillStyle = "#8395a7";
+                ctx.fillText(value, paddingLeft - 10, yPos);
+            }
+
+            // --- DRAW BARS ---
             const barWidth = (chartW / numBars) * 0.8;
             const gap = (chartW / numBars) * 0.2;
 
@@ -268,7 +292,7 @@
                 
                 const barHeight = (count / maxCount) * chartH;
                 
-                const x = paddingX + (i * (barWidth + gap)) + (gap/2);
+                const x = paddingLeft + (i * (barWidth + gap)) + (gap/2);
                 const y = height - paddingBottom - barHeight;
 
                 // Gradient
@@ -281,13 +305,12 @@
                 ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0]);
                 ctx.fill();
 
-                // Draw number labels on bars ONLY if bars are wide enough (>25px)
+                // Draw number labels on bars ONLY if bars are wide enough
                 if (barWidth > 25) {
                     ctx.fillStyle = "#fff";
                     ctx.font = "bold 10px sans-serif";
                     ctx.textAlign = "center";
-                    // Draw just below the bar
-                    ctx.fillText(sumValue, x + barWidth/2, height - paddingBottom + 12);
+                    ctx.fillText(sumValue, x + barWidth/2, height - paddingBottom + 15);
                 }
             }
         }
@@ -328,5 +351,4 @@
 
     </script>
 </body>
-
 </html>
