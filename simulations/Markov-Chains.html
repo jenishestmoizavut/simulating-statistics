@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markov Chain Simulator</title>
+    <title>Dynamic Markov Chain</title>
     <link rel="icon" href="../favicon.ico">
     <style>
         :root {
@@ -11,587 +11,498 @@
             --bg-grad-2: #2a5298;
             --card-bg: rgba(255, 255, 255, 0.1);
             --text-color: #ffffff;
-            --accent-color: #f1c40f;
-            --state-a-color: #f1c40f;
-            --state-b-color: #3498db;
+            --accent-color: #00d2d3;
         }
 
         body {
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: linear-gradient(135deg, var(--bg-grad-1), var(--bg-grad-2));
             color: var(--text-color);
-            margin: 0;
-            padding: 20px;
+            margin: 0; padding: 20px;
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            overflow-x: hidden;
-            transition: background 0.5s;
+            display: flex; flex-direction: column; align-items: center;
         }
 
-        h1 { margin: 10px 0 5px; font-weight: 300; letter-spacing: 3px; text-transform: uppercase; }
-        .subtitle { font-size: 0.9rem; opacity: 0.7; margin-bottom: 30px; font-style: italic; }
+        h1 { margin: 10px 0 5px; font-weight: 300; letter-spacing: 3px; text-transform: uppercase; text-align: center; }
+        .subtitle { font-size: 0.9rem; opacity: 0.7; margin-bottom: 20px; font-style: italic; text-align: center; }
 
-        /* --- CONTROLS SECTION --- */
+        /* --- CONTROLS --- */
         .controls-top {
-            background: rgba(0,0,0,0.3);
-            padding: 10px 20px;
-            border-radius: 50px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            margin-bottom: 30px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            background: rgba(0,0,0,0.3); padding: 10px 20px; border-radius: 50px;
+            display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center;
+            margin-bottom: 20px; backdrop-filter: blur(10px);
         }
 
-        select {
-            background: transparent;
-            color: white;
-            border: 1px solid rgba(255,255,255,0.3);
-            padding: 8px 15px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.9rem;
+        select, button {
+            background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);
+            padding: 8px 15px; border-radius: 20px; cursor: pointer; font-size: 0.9rem;
+            transition: all 0.2s;
         }
-        select:focus { outline: none; border-color: var(--accent-color); background: #2c3e50; }
+        select:focus, button:hover { background: rgba(255,255,255,0.2); outline: none; }
+        .btn-action { background: var(--accent-color); color: #2c3e50; font-weight: bold; border: none; }
+        .btn-action:active { transform: scale(0.95); }
 
-        .sound-toggle {
-            cursor: pointer;
-            font-size: 1.2rem;
-            width: 40px; height: 40px;
-            display: flex; align-items: center; justify-content: center;
-            background: rgba(255,255,255,0.1);
-            border-radius: 50%;
-            transition: background 0.2s;
-        }
-        .sound-toggle:hover { background: rgba(255,255,255,0.2); }
-        .sound-toggle.muted { opacity: 0.5; text-decoration: line-through; }
-
-        /* --- VISUALIZATION STAGE --- */
+        /* --- STAGE (The Graph) --- */
         .stage-container {
-            position: relative;
-            width: 100%;
-            max-width: 600px;
-            height: 300px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            position: relative; width: 100%; max-width: 500px; height: 400px;
             margin-bottom: 20px;
         }
-
-        /* SVG Arrows Layer */
+        
         .svg-layer {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            pointer-events: none;
-            z-index: 0;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 0;
         }
+        
+        /* Arrows */
         path {
-            fill: none;
-            stroke: rgba(255,255,255,0.3);
-            stroke-width: 2;
-            transition: stroke 0.3s, stroke-width 0.2s;
+            fill: none; stroke: rgba(255,255,255,0.1); stroke-width: 1;
+            transition: stroke 0.2s;
         }
         path.active-path {
-            stroke: var(--accent-color);
-            stroke-width: 4;
+            stroke: var(--accent-color); stroke-width: 3;
             filter: drop-shadow(0 0 5px var(--accent-color));
         }
 
-        /* State Nodes */
-        .nodes-wrapper {
-            display: flex;
-            justify-content: space-between;
-            width: 300px;
-            z-index: 1;
-        }
-
+        /* Nodes */
         .node {
-            width: 100px; height: 100px;
-            border-radius: 50%;
-            background: var(--card-bg);
-            border: 2px solid rgba(255,255,255,0.2);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            position: absolute; width: 80px; height: 80px;
+            border-radius: 50%; background: var(--card-bg);
+            border: 2px solid rgba(255,255,255,0.3);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
             backdrop-filter: blur(5px);
-            transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
-            position: relative;
-        }
-
-        .node.active {
-            transform: scale(1.15);
-            box-shadow: 0 0 30px rgba(255,255,255,0.4);
-            border-color: white;
-            z-index: 2;
-        }
-
-        .node-icon { font-size: 2.5rem; margin-bottom: 5px; }
-        .node-label { font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
-        
-        /* Particle Moving Animation */
-        .particle {
-            position: absolute;
-            width: 20px; height: 20px;
-            background: white;
-            border-radius: 50%;
-            box-shadow: 0 0 10px white;
+            transition: transform 0.2s, background-color 0.2s;
             z-index: 10;
-            opacity: 0;
-            pointer-events: none;
+            transform: translate(-50%, -50%); /* Center on coordinates */
         }
+        .node.active {
+            transform: translate(-50%, -50%) scale(1.2);
+            border-color: #fff; background: rgba(255,255,255,0.2);
+            box-shadow: 0 0 20px rgba(255,255,255,0.3);
+            z-index: 20;
+        }
+        .node-icon { font-size: 2rem; }
+        .node-label { font-size: 0.7rem; font-weight: bold; margin-top: 2px; text-transform: uppercase; }
 
-        /* --- HISTORY TICKER --- */
-        .ticker-container {
-            width: 100%; max-width: 600px;
-            height: 50px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 10px;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            padding: 0 10px;
-            margin-bottom: 30px;
-            border: 1px solid rgba(255,255,255,0.05);
-            position: relative;
+        /* --- STATS --- */
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px; width: 100%; max-width: 600px; margin-bottom: 20px;
         }
-        .ticker-container::after {
-            content: ''; position: absolute; top: 0; right: 0; width: 50px; height: 100%;
-            background: linear-gradient(to right, transparent, rgba(0,0,0,0.4));
+        .stat-card {
+            background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; text-align: center;
+            border-bottom: 3px solid transparent;
         }
-        .ticker-item {
-            font-size: 1.5rem;
-            margin-right: 10px;
-            animation: slideIn 0.3s ease-out;
-        }
-        @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-        /* --- STATS & CONTROLS --- */
-        .dashboard {
-            background: var(--card-bg);
-            padding: 25px;
-            border-radius: 20px;
-            width: 100%; max-width: 550px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .stat-row { margin-bottom: 15px; }
-        .stat-header { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; }
-        
-        .progress-track {
-            height: 12px; background: rgba(0,0,0,0.3); border-radius: 6px; overflow: hidden; position: relative;
-        }
-        .progress-bar { height: 100%; transition: width 0.2s linear; }
-        .target-line {
-            position: absolute; top: 0; bottom: 0; width: 2px; background: white;
-            box-shadow: 0 0 4px black; z-index: 5;
-        }
-
-        .action-area {
-            display: flex; gap: 10px; justify-content: center; margin-top: 25px; flex-wrap: wrap;
-        }
-
-        button {
-            border: none; padding: 12px 24px; border-radius: 30px; font-weight: bold; cursor: pointer;
-            font-size: 0.9rem; transition: transform 0.1s, filter 0.2s;
-        }
-        button:active { transform: scale(0.95); }
-        .btn-step { background: rgba(255,255,255,0.2); color: white; }
-        .btn-run { background: white; color: #333; }
-        .btn-run.running { background: #ff7675; color: white; }
-        
-        input[type=range] { accent-color: var(--accent-color); }
+        .stat-val { font-size: 1.2rem; font-weight: bold; }
+        .stat-name { font-size: 0.8rem; opacity: 0.7; }
 
         /* --- MODAL --- */
         .modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 100;
+            background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 100;
         }
         .modal.open { display: flex; }
         .modal-content {
             background: #2c3e50; padding: 30px; border-radius: 20px; max-width: 500px; color: white;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); position: relative;
         }
+        textarea {
+            width: 100%; height: 150px; background: rgba(0,0,0,0.3); color: lime; 
+            border: 1px solid #555; padding: 10px; font-family: monospace; border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .close-btn { position: absolute; top: 15px; right: 20px; font-size: 1.5rem; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <h1>Markov Chain</h1>
-    <p class="subtitle">Visualizing Stochastic Processes</p>
+    <h1>Markov Chain Sim</h1>
+    <p class="subtitle">Visualizing state transitions over time</p>
 
     <div class="controls-top">
         <select id="presetSelect" onchange="loadPreset()">
-            <option value="weather">Scenario: Weather (Balanced)</option>
-            <option value="brand">Scenario: Sticky Brand (High Loyalty)</option>
-            <option value="habit">Scenario: Bad Habit (Trap State)</option>
-            <option value="gamble">Scenario: Gambler's Ruin</option>
+            <option value="weather">2-State: Weather</option>
+            <option value="life">3-State: Eat Sleep Code</option>
+            <option value="gamble">2-State: Gambler</option>
+            <option value="custom">Custom Matrix...</option>
         </select>
-        <div class="sound-toggle" id="soundBtn" onclick="toggleMute()" title="Toggle Sound">
-            🔊
-        </div>
+        
+        <button onclick="toggleInfo()">ℹ️ Explain</button>
+        <button onclick="toggleMute()" id="muteBtn">🔊</button>
     </div>
 
-    <div class="stage-container">
-        <svg class="svg-layer" viewBox="0 0 600 300">
+    <div class="stage-container" id="stage">
+        <svg class="svg-layer" id="svgLayer">
             <defs>
-                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,255,255,0.5)" />
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="28" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,255,255,0.3)" />
                 </marker>
             </defs>
-            <path id="pathAA" d="M 200,110 C 150,50 250,50 200,110" /> <path id="pathBB" d="M 400,110 C 350,50 450,50 400,110" /> <path id="pathAB" d="M 210,150 Q 300,100 390,150" marker-end="url(#arrowhead)"/> <path id="pathBA" d="M 390,150 Q 300,200 210,150" marker-end="url(#arrowhead)"/> </svg>
-
-        <div class="nodes-wrapper">
-            <div class="node" id="node0">
-                <div class="node-icon" id="icon0">☀️</div>
-                <div class="node-label" id="label0">Sunny</div>
-            </div>
-            <div class="node" id="node1">
-                <div class="node-icon" id="icon1">🌧️</div>
-                <div class="node-label" id="label1">Rainy</div>
-            </div>
+            </svg>
         </div>
-        
-        <div class="particle" id="particle"></div>
+
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <div style="text-align:center; font-family: monospace; opacity: 0.6; margin-bottom: 20px;">
+        Steps: <span id="stepCount">0</span>
     </div>
 
-    <div class="ticker-container" id="tickerTape">
+    <div class="controls-top">
+        <button class="btn-action" onclick="manualStep()">+1 Step</button>
+        <button class="btn-action" id="runBtn" onclick="toggleRun()">Run Fast</button>
+        <div style="display:flex; flex-direction:column; align-items:center;">
+            <span style="font-size:0.6rem;">SPEED</span>
+            <input type="range" id="speedRange" min="1" max="100" value="10">
         </div>
-
-    <div class="dashboard">
-        <div style="text-align: center; font-family: monospace; opacity: 0.6; margin-bottom: 15px;">
-            TOTAL STEPS: <span id="stepCount">0</span>
-        </div>
-
-        <div class="stat-row">
-            <div class="stat-header">
-                <span id="statName0">State A</span>
-                <span id="statPct0">0%</span>
-            </div>
-            <div class="progress-track">
-                <div class="progress-bar" id="bar0" style="width: 0%; background: var(--state-a-color);"></div>
-                <div class="target-line" id="target0" title="Theoretical Limit"></div>
-            </div>
-        </div>
-
-        <div class="stat-row">
-            <div class="stat-header">
-                <span id="statName1">State B</span>
-                <span id="statPct1">0%</span>
-            </div>
-            <div class="progress-track">
-                <div class="progress-bar" id="bar1" style="width: 0%; background: var(--state-b-color);"></div>
-                <div class="target-line" id="target1" title="Theoretical Limit"></div>
-            </div>
-        </div>
-
-        <div class="action-area">
-            <button class="btn-step" onclick="manualStep()">+1 Step</button>
-            <button class="btn-run" id="runBtn" onclick="toggleRun()">Run Fast</button>
-            
-            <div style="display:flex; flex-direction:column; align-items:center; margin-left: 10px;">
-                <span style="font-size:0.6rem; font-weight:bold;">SPEED</span>
-                <input type="range" id="speedRange" min="1" max="100" value="10">
-            </div>
-            
-            <button class="btn-step" onclick="reset()">Reset</button>
-            <button class="btn-step" onclick="toggleModal()">?</button>
-        </div>
+        <button onclick="reset()">Reset</button>
     </div>
 
     <div class="modal" id="infoModal">
         <div class="modal-content">
-            <h2>Markov Chains & Sounds</h2>
-            <p>This simulation creates a generated "soundscape" based on probability.</p>
-            <ul>
-                <li><strong>High Pitch:</strong> State A (e.g., Sunny)</li>
-                <li><strong>Low Pitch:</strong> State B (e.g., Rainy)</li>
-            </ul>
-            <p><strong>Note:</strong> Sound automatically mutes if you crank the speed up to save your ears!</p>
-            <button class="btn-run" onclick="toggleModal()">Got it</button>
+            <span class="close-btn" onclick="toggleInfo()">&times;</span>
+            <h2>What is a Markov Chain?</h2>
+            <p>It's a mathematical system that hops from one "State" to another according to fixed probability rules.</p>
+            <p><strong>The Golden Rule (Memoryless):</strong><br>
+            The future depends <em>only</em> on where you are right now, not where you were before. The past doesn't matter!</p>
+            <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1); margin: 20px 0;">
+            <p><strong>Try it:</strong><br>Select "Custom Matrix" to input your own probabilities and see what happens!</p>
+        </div>
+    </div>
+
+    <div class="modal" id="customModal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="document.getElementById('customModal').classList.remove('open')">&times;</span>
+            <h2>Custom Matrix</h2>
+            <p>Enter a Transition Matrix (rows must sum to 1). Format: JSON.</p>
+            <textarea id="matrixInput" spellcheck="false">
+[
+  [0.5, 0.25, 0.25], 
+  [0.25, 0.5, 0.25], 
+  [0.25, 0.25, 0.5]
+]</textarea>
+            <div style="margin-bottom: 10px;">
+                <label>Labels (comma separated):</label><br>
+                <input type="text" id="labelsInput" value="A, B, C" style="width:100%; padding:8px; margin-top:5px; background:rgba(0,0,0,0.3); color:white; border:1px solid #555;">
+            </div>
+            <button class="btn-action" onclick="applyCustom()">Load Matrix</button>
+            <p id="errorMsg" style="color: #ff7675; font-size: 0.8rem; margin-top: 10px;"></p>
         </div>
     </div>
 
     <script>
-        // --- AUDIO SYSTEM (Web Audio API) ---
+        // --- DATA ---
+        const presets = {
+            weather: {
+                labels: ["Sunny", "Rainy"],
+                icons: ["☀️", "🌧️"],
+                matrix: [[0.7, 0.3], [0.4, 0.6]],
+                colors: ["#f1c40f", "#3498db"]
+            },
+            life: {
+                labels: ["Eat", "Sleep", "Code"],
+                icons: ["🍔", "💤", "💻"],
+                matrix: [
+                    [0.2, 0.1, 0.7], // Eat -> mostly Code
+                    [0.1, 0.5, 0.4], // Sleep -> mostly Sleep or Code
+                    [0.3, 0.3, 0.4]  // Code -> balanced
+                ],
+                colors: ["#e67e22", "#9b59b6", "#2ecc71"]
+            },
+            gamble: {
+                labels: ["Win", "Loss"],
+                icons: ["🤑", "💸"],
+                matrix: [[0.45, 0.55], [0.45, 0.55]], // House edge
+                colors: ["#2ecc71", "#e74c3c"]
+            }
+        };
+
+        // --- STATE ---
+        let currentConfig = null;
+        let currentState = 0;
+        let counts = [];
+        let totalSteps = 0;
+        let isRunning = false;
+        let animFrame;
+        
+        // --- AUDIO ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContext();
         let isMuted = false;
 
-        function playSound(type) {
+        function playSound(stateIndex) {
             if (isMuted || audioCtx.state === 'suspended') return;
-            
-            // Auto-mute if speed is too high to prevent glitching
             const speed = parseInt(document.getElementById('speedRange').value);
-            if (speed > 25) return; 
+            if(speed > 30) return; // Mute if too fast
 
             const osc = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
 
-            osc.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
+            // Pentatonic mapping based on state index
+            const baseFreq = 220;
+            const mult = [1, 1.12, 1.25, 1.5, 1.66]; // Scale ratios
+            const freq = baseFreq * (mult[stateIndex % 5] || 2);
 
-            // "Type" 0 = State A (High/Happy), "Type" 1 = State B (Low/Sad)
-            if (type === 0) {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
-                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
-            } else {
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(220, audioCtx.currentTime); // A3
-                osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.1);
-            }
-
-            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
 
             osc.start();
             osc.stop(audioCtx.currentTime + 0.1);
         }
 
-        function toggleMute() {
-            isMuted = !isMuted;
-            document.getElementById('soundBtn').innerHTML = isMuted ? '🔇' : '🔊';
-            document.getElementById('soundBtn').classList.toggle('muted');
-            if(!isMuted && audioCtx.state === 'suspended') audioCtx.resume();
-        }
-
-
-        // --- CONFIG & STATE ---
-        const presets = {
-            weather: {
-                colors: ["#f1c40f", "#3498db"],
-                labels: ["Sunny", "Rainy"],
-                icons: ["☀️", "🌧️"],
-                matrix: [[0.7, 0.3], [0.4, 0.6]], // [ [A->A, A->B], [B->A, B->B] ]
-                target: [57.1, 42.9]
-            },
-            brand: {
-                colors: ["#e74c3c", "#8e44ad"],
-                labels: ["Brand A", "Brand B"],
-                icons: ["🅰️", "🅱️"],
-                matrix: [[0.9, 0.1], [0.1, 0.9]],
-                target: [50.0, 50.0]
-            },
-            habit: {
-                colors: ["#2ecc71", "#7f8c8d"],
-                labels: ["Healthy", "Habit"],
-                icons: ["🥗", "🚬"],
-                matrix: [[0.5, 0.5], [0.1, 0.9]],
-                target: [16.7, 83.3]
-            },
-            gamble: {
-                colors: ["#27ae60", "#c0392b"],
-                labels: ["Win", "Loss"],
-                icons: ["🤑", "💸"],
-                matrix: [[0.4, 0.6], [0.6, 0.4]],
-                target: [50.0, 50.0]
-            }
-        };
-
-        let currentPreset = presets.weather;
-        let currentState = 0;
-        let counts = [0, 0];
-        let total = 0;
-        let isRunning = false;
-        let animationFrame;
-
-        // --- DOM ELEMENTS ---
-        const nodes = [document.getElementById('node0'), document.getElementById('node1')];
-        const icons = [document.getElementById('icon0'), document.getElementById('icon1')];
-        const labels = [document.getElementById('label0'), document.getElementById('label1')];
-        const bars = [document.getElementById('bar0'), document.getElementById('bar1')];
-        const targets = [document.getElementById('target0'), document.getElementById('target1')];
-        const statPcts = [document.getElementById('statPct0'), document.getElementById('statPct1')];
-        const statNames = [document.getElementById('statName0'), document.getElementById('statName1')];
-        const particle = document.getElementById('particle');
-        const ticker = document.getElementById('tickerTape');
-        const paths = {
-            '00': document.getElementById('pathAA'),
-            '01': document.getElementById('pathAB'),
-            '10': document.getElementById('pathBA'),
-            '11': document.getElementById('pathBB')
-        };
-
-        // --- CORE LOGIC ---
+        // --- INIT & GRAPHICS ---
         function loadPreset() {
-            const key = document.getElementById('presetSelect').value;
-            currentPreset = presets[key];
-
-            // Update Colors CSS Variables
-            document.documentElement.style.setProperty('--state-a-color', currentPreset.colors[0]);
-            document.documentElement.style.setProperty('--state-b-color', currentPreset.colors[1]);
-            document.documentElement.style.setProperty('--accent-color', currentPreset.colors[0]);
-
-            // Update UI Text
-            for(let i=0; i<2; i++) {
-                icons[i].innerText = currentPreset.icons[i];
-                labels[i].innerText = currentPreset.labels[i];
-                statNames[i].innerText = currentPreset.labels[i];
-                targets[i].style.left = currentPreset.target[i] + "%";
+            const val = document.getElementById('presetSelect').value;
+            if(val === 'custom') {
+                document.getElementById('customModal').classList.add('open');
+                return;
             }
-
-            reset();
+            setup(presets[val]);
         }
 
-        function reset() {
-            isRunning = false;
-            cancelAnimationFrame(animationFrame);
-            document.getElementById('runBtn').classList.remove('running');
-            document.getElementById('runBtn').innerText = "Run Fast";
+        function applyCustom() {
+            const txt = document.getElementById('matrixInput').value;
+            const lbls = document.getElementById('labelsInput').value.split(',').map(s=>s.trim());
             
+            try {
+                const mat = JSON.parse(txt);
+                // Basic validation
+                if(!Array.isArray(mat) || mat.length !== mat[0].length) throw new Error("Matrix must be square array");
+                
+                // Build Config object
+                const cfg = {
+                    labels: lbls.slice(0, mat.length),
+                    icons: mat.map((_,i) => String.fromCharCode(65+i)), // A, B, C icons
+                    matrix: mat,
+                    colors: mat.map((_,i) => `hsl(${i * (360/mat.length)}, 70%, 50%)`)
+                };
+                
+                document.getElementById('customModal').classList.remove('open');
+                setup(cfg);
+            } catch(e) {
+                document.getElementById('errorMsg').innerText = "Error: " + e.message;
+            }
+        }
+
+        function setup(config) {
+            currentConfig = config;
             currentState = 0;
-            counts = [0, 0];
-            total = 0;
-            ticker.innerHTML = '';
+            totalSteps = 0;
+            counts = new Array(config.matrix.length).fill(0);
             
-            updateVisuals(true);
+            renderGraph();
+            renderStats();
+            updateStatsUI();
         }
 
-        function step() {
-            // 1. Determine Next State
-            const probs = currentPreset.matrix[currentState]; // [Stay, Switch] probability
-            // probs[0] is P(stay), probs[1] is P(switch) if we assume matrix is standard
-            // My matrix: [ [P(0->0), P(0->1)], [P(1->0), P(1->1)] ]
-            // Actually let's use the row directly.
+        function renderGraph() {
+            const stage = document.getElementById('stage');
+            const svg = document.getElementById('svgLayer');
+            const num = currentConfig.matrix.length;
             
-            const r = Math.random();
-            let nextState;
+            // Clear old
+            document.querySelectorAll('.node').forEach(e => e.remove());
+            svg.innerHTML = '<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="28" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,255,255,0.3)" /></marker></defs>';
+
+            const cx = stage.clientWidth / 2;
+            const cy = stage.clientHeight / 2;
+            const r = Math.min(cx, cy) - 60; // Radius
+
+            // 1. Create Nodes
+            for(let i=0; i<num; i++) {
+                const angle = (i / num) * 2 * Math.PI - (Math.PI/2); // Start top
+                const x = cx + r * Math.cos(angle);
+                const y = cy + r * Math.sin(angle);
+
+                const node = document.createElement('div');
+                node.className = 'node';
+                node.id = `node-${i}`;
+                node.style.left = x + 'px';
+                node.style.top = y + 'px';
+                node.style.borderColor = currentConfig.colors[i];
+                node.innerHTML = `
+                    <div class="node-icon">${currentConfig.icons[i] || '#'}</div>
+                    <div class="node-label">${currentConfig.labels[i]}</div>
+                `;
+                stage.appendChild(node);
+            }
+
+            // 2. Create Paths (Full Mesh)
+            for(let i=0; i<num; i++) {
+                for(let j=0; j<num; j++) {
+                    if(currentConfig.matrix[i][j] > 0) {
+                        createPath(i, j, num, cx, cy, r);
+                    }
+                }
+            }
             
-            if (currentState === 0) {
-                // Row 0: [P(0->0), P(0->1)]
-                nextState = (r < currentPreset.matrix[0][0]) ? 0 : 1;
+            highlightNode(0);
+        }
+
+        function createPath(from, to, total, cx, cy, r) {
+            const svg = document.getElementById('svgLayer');
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.id = `path-${from}-${to}`;
+            path.setAttribute("marker-end", "url(#arrowhead)");
+
+            // Coords
+            const ang1 = (from / total) * 2 * Math.PI - (Math.PI/2);
+            const ang2 = (to / total) * 2 * Math.PI - (Math.PI/2);
+            
+            const x1 = cx + r * Math.cos(ang1);
+            const y1 = cy + r * Math.sin(ang1);
+            const x2 = cx + r * Math.cos(ang2);
+            const y2 = cy + r * Math.sin(ang2);
+
+            let d = "";
+            if(from === to) {
+                // Self Loop (Curve out and back)
+                const loopR = 40;
+                const lx = x1 + loopR * Math.cos(ang1);
+                const ly = y1 + loopR * Math.sin(ang1);
+                d = `M ${x1} ${y1} Q ${lx} ${ly} ${x1+5} ${y1+5}`; // Simplified loop
+                // Actually self-loops in SVG are tricky without bezier control points pointing out
+                // Let's just point it outwards
+                const cx1 = x1 + 60 * Math.cos(ang1 - 0.3);
+                const cy1 = y1 + 60 * Math.sin(ang1 - 0.3);
+                const cx2 = x1 + 60 * Math.cos(ang1 + 0.3);
+                const cy2 = y1 + 60 * Math.sin(ang1 + 0.3);
+                d = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x1} ${y1}`;
             } else {
-                // Row 1: [P(1->0), P(1->1)] -- Note: index 0 is switching to 0
-                nextState = (r < currentPreset.matrix[1][0]) ? 0 : 1;
+                // Curve towards center slightly to avoid overlapping straight lines
+                // or curve outwards? Let's do simple straight for now, quadratic for style
+                d = `M ${x1} ${y1} L ${x2} ${y2}`;
             }
-
-            // 2. Play Sound
-            playSound(nextState);
-
-            // 3. Highlight Path (only if slow enough to see)
-            const speed = parseInt(document.getElementById('speedRange').value);
-            if (speed < 50) {
-                highlightPath(currentState, nextState);
-            }
-
-            // 4. Update State
-            currentState = nextState;
-            counts[currentState]++;
-            total++;
-
-            // 5. Update UI
-            updateVisuals();
-        }
-
-        function highlightPath(from, to) {
-            // Reset all paths
-            document.querySelectorAll('path').forEach(p => p.classList.remove('active-path'));
             
-            // Activate specific path
-            const pathKey = "" + from + to;
-            const path = paths[pathKey];
-            if(path) {
-                path.classList.add('active-path');
-                setTimeout(() => path.classList.remove('active-path'), 200);
-            }
+            path.setAttribute("d", d);
+            svg.appendChild(path);
         }
 
-        function updateVisuals(isReset = false) {
-            // Nodes active state
-            nodes.forEach((n, i) => {
-                if(i === currentState) n.classList.add('active');
-                else n.classList.remove('active');
+        function renderStats() {
+            const grid = document.getElementById('statsGrid');
+            grid.innerHTML = '';
+            currentConfig.labels.forEach((lbl, i) => {
+                const div = document.createElement('div');
+                div.className = 'stat-card';
+                div.style.borderBottomColor = currentConfig.colors[i];
+                div.innerHTML = `
+                    <div class="stat-name">${lbl}</div>
+                    <div class="stat-val" id="val-${i}">0%</div>
+                `;
+                grid.appendChild(div);
             });
+        }
 
-            // Update Stats
-            document.getElementById('stepCount').innerText = total.toLocaleString();
+        // --- LOGIC ---
+        function step() {
+            // 1. Get Row
+            const row = currentConfig.matrix[currentState];
             
-            if (total > 0) {
-                const p0 = (counts[0] / total * 100).toFixed(1);
-                const p1 = (counts[1] / total * 100).toFixed(1);
-                
-                bars[0].style.width = p0 + "%";
-                statPct0.innerText = p0 + "%";
-                
-                bars[1].style.width = p1 + "%";
-                statPct1.innerText = p1 + "%";
-            } else {
-                bars[0].style.width = "0%";
-                bars[1].style.width = "0%";
-                statPct0.innerText = "0%";
-                statPct1.innerText = "0%";
+            // 2. Weighted Random
+            const r = Math.random();
+            let sum = 0;
+            let nextState = -1;
+            
+            for(let i=0; i<row.length; i++) {
+                sum += row[i];
+                if(r < sum) {
+                    nextState = i;
+                    break;
+                }
             }
+            if(nextState === -1) nextState = row.length - 1; // Fallback
 
-            // Update Ticker Tape (Only add if speed is manageable)
-            const speed = parseInt(document.getElementById('speedRange').value);
-            if (!isReset && speed < 80) {
-                const span = document.createElement('span');
-                span.className = 'ticker-item';
-                span.innerText = currentPreset.icons[currentState];
-                ticker.prepend(span);
-                if (ticker.children.length > 20) ticker.lastChild.remove();
+            // 3. Visuals
+            highlightTransition(currentState, nextState);
+            currentState = nextState;
+            
+            // 4. Data
+            totalSteps++;
+            counts[currentState]++;
+            
+            // 5. UI Updates
+            updateStatsUI();
+            playSound(currentState);
+            highlightNode(currentState);
+        }
+
+        function highlightTransition(from, to) {
+            const p = document.getElementById(`path-${from}-${to}`);
+            if(p) {
+                p.classList.add('active-path');
+                setTimeout(()=>p.classList.remove('active-path'), 200);
             }
         }
 
-        // --- ANIMATION LOOP ---
+        function highlightNode(idx) {
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+            document.getElementById(`node-${idx}`).classList.add('active');
+        }
+
+        function updateStatsUI() {
+            document.getElementById('stepCount').innerText = totalSteps;
+            counts.forEach((c, i) => {
+                const pct = totalSteps === 0 ? 0 : ((c/totalSteps)*100).toFixed(1);
+                document.getElementById(`val-${i}`).innerText = pct + "%";
+            });
+        }
+
+        // --- CONTROLS ---
         function toggleRun() {
             isRunning = !isRunning;
             const btn = document.getElementById('runBtn');
-            if (isRunning) {
+            if(isRunning) {
                 btn.innerText = "Pause";
-                btn.classList.add('running');
+                btn.classList.add('btn-action');
                 if(audioCtx.state === 'suspended') audioCtx.resume();
                 loop();
             } else {
                 btn.innerText = "Run Fast";
-                btn.classList.remove('running');
-                cancelAnimationFrame(animationFrame);
+                cancelAnimationFrame(animFrame);
             }
         }
 
+        function loop() {
+            if(!isRunning) return;
+            
+            const speed = parseInt(document.getElementById('speedRange').value);
+            // Steps per frame logic
+            let steps = 1;
+            if(speed > 50) steps = Math.floor(Math.pow(speed-40, 1.5));
+            
+            for(let i=0; i<steps; i++) step();
+
+            let delay = 0;
+            if(speed < 40) delay = (40-speed) * 10;
+            
+            if(delay > 0) setTimeout(()=> animFrame = requestAnimationFrame(loop), delay);
+            else animFrame = requestAnimationFrame(loop);
+        }
+
         function manualStep() {
-            if(isRunning) toggleRun(); // Stop auto if manual clicked
+            if(isRunning) toggleRun();
             if(audioCtx.state === 'suspended') audioCtx.resume();
             step();
         }
 
-        function loop() {
-            if (!isRunning) return;
-
-            const speed = parseInt(document.getElementById('speedRange').value);
-            
-            // If speed is super high, do multiple calcs per frame
-            let stepsPerFrame = 1;
-            if (speed > 50) stepsPerFrame = Math.floor(Math.pow(speed - 40, 1.6));
-
-            for (let i = 0; i < stepsPerFrame; i++) {
-                step();
-            }
-
-            // Throttle visual updates if running very fast
-            let delay = 0;
-            if (speed < 30) delay = (30 - speed) * 20;
-
-            if (delay > 0) {
-                setTimeout(() => {
-                    animationFrame = requestAnimationFrame(loop);
-                }, delay);
-            } else {
-                animationFrame = requestAnimationFrame(loop);
-            }
+        function reset() {
+            isRunning = false;
+            cancelAnimationFrame(animFrame);
+            document.getElementById('runBtn').innerText = "Run Fast";
+            setup(currentConfig);
         }
 
-        function toggleModal() {
-            const m = document.getElementById('infoModal');
-            m.classList.toggle('open');
+        function toggleInfo() { document.getElementById('infoModal').classList.toggle('open'); }
+        function toggleMute() { 
+            isMuted = !isMuted;
+            document.getElementById('muteBtn').innerText = isMuted ? '🔇' : '🔊';
         }
 
         // Init
-        loadPreset();
+        window.onload = () => loadPreset();
 
     </script>
 </body>
