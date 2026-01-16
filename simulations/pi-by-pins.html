@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Buffon's Needle Sim</title>
     <link rel="icon" href="../favicon.ico">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg-color: #222f3e;
@@ -76,6 +77,9 @@
         .pi-display { color: var(--accent); font-size: 1.8rem !important; }
         .pi-display.close { color: #1dd1a1; text-shadow: 0 0 10px rgba(29, 209, 161, 0.4); }
 
+        /* Chart Area */
+        .chart-card { grid-column: span 3; height: 180px; }
+
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center;
@@ -85,18 +89,16 @@
         .modal-card {
             background: white; padding: 30px; border-radius: 20px;
             max-width: 550px; width: 90%; color: #2d3436;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
-        .close-btn { margin-top: 20px; width: 100%; background: #222f3e; }
     </style>
 </head>
 <body>
 
     <h1>Buffon's Needle</h1>
-    <p class="subtitle">Estimating &pi; by dropping sticks</p>
+    <p class="subtitle">Estimating &pi; by dropping sticks (Tab-Safe Simulation)</p>
 
     <div class="controls">
-        <button onclick="dropNeedle()">+1 Drop</button>
+        <button onclick="manualDrop()">+1 Drop</button>
         <button id="btnStart" class="primary" onclick="toggleSim()">Run Auto</button>
         
         <div class="slide-container">
@@ -126,101 +128,203 @@
             <h3>Estimated &pi;</h3>
             <div class="value pi-display" id="piEl">0.0000</div>
         </div>
+
+        <div class="stat-card chart-card">
+            <h3>Convergence Trend</h3>
+            <canvas id="piChart"></canvas>
+        </div>
     </div>
 
     <div class="modal-overlay" id="modal">
         <div class="modal-card">
             <h2>The Magic of &pi;</h2>
             
-            <p>In the 18th century, the Comte de Buffon discovered that if you drop needles on parallel lines, the probability of crossing a line is related to &pi;.</p>
-            <p>If the needle length ($l$) equals the line spacing ($d$):</p>
-            <p style="text-align: center; font-size: 1.2rem; font-weight: bold; color: #54a0ff;">P = 2 / &pi;</p>
+            <p>This version uses a <strong>Web Worker</strong>. This means the math happens in a background thread, allowing the simulation to continue even if you switch browser tabs.</p>
             <p style="text-align: center; font-size: 1.2rem; font-weight: bold; color: #1dd1a1;">&pi; &approx; 2 &times; (Total / Crosses)</p>
-            <button class="close-btn" onclick="toggleModal()">Got it!</button>
+            <button class="close-btn" onclick="toggleModal()" style="width:100%; background:#222f3e; color:white; padding:10px; border-radius:20px; border:none; cursor:pointer;">Got it!</button>
         </div>
     </div>
 
     <script>
+        // --- 1. WEB WORKER LOGIC (Running in Background) ---
+        const workerCode = `
+            let total = 0;
+            let crosses = 0;
+            let isRunning = false;
+            let interval;
+
+            self.onmessage = function(e) {
+                if (e.data.type === 'START') {
+                    isRunning = true;
+                    runLoop(e.data.speed);
+                } else if (e.data.type === 'STOP') {
+                    isRunning = false;
+                    clearInterval(interval);
+                } else if (e.data.type === 'RESET') {
+                    total = 0; crosses = 0;
+                } else if (e.data.type === 'MANUAL') {
+                    calculateDrops(1, e.data.width, e.data.height, e.data.lineSpacing, e.data.needleLength);
+                }
+            };
+
+            function runLoop(speed) {
+                clearInterval(interval);
+                interval = setInterval(() => {
+                    if (isRunning) {
+                        calculateDrops(speed, 600, 600, 60, 60);
+                    }
+                }, 16); // ~60fps logic
+            }
+
+            function calculateDrops(count, width, height, lineSpacing, needleLength) {
+                let batch = [];
+                for(let i=0; i<count; i++) {
+                    const x = Math.random() * width;
+                    const y = Math.random() * height;
+                    const angle = Math.random() * Math.PI;
+                    const y1 = y - (needleLength / 2) * Math.sin(angle);
+                    const y2 = y + (needleLength / 2) * Math.sin(angle);
+                    const isCross = Math.floor(y1 / lineSpacing) !== Math.floor(y2 / lineSpacing);
+                    
+                    if (isCross) crosses++;
+                    total++;
+
+                    // Only send needles to UI if batch is small to avoid lag
+                    if (count < 50) {
+                        batch.push({
+                            x1: x - (needleLength / 2) * Math.cos(angle),
+                            y1: y1,
+                            x2: x + (needleLength / 2) * Math.cos(angle),
+                            y2: y2,
+                            crosses: isCross
+                        });
+                    }
+                }
+                self.postMessage({ total, crosses, batch });
+            }
+        `;
+
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const worker = new Worker(URL.createObjectURL(blob));
+
+        // --- 2. UI & CHARTING ---
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const totalEl = document.getElementById('totalEl');
-        const crossEl = document.getElementById('crossEl');
-        const piEl = document.getElementById('piEl');
-        const speedRange = document.getElementById('speedRange');
-
-        // Audio Engine
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const piChartCtx = document.getElementById('piChart').getContext('2d');
+        let chart;
         let audioCtx;
         let isMuted = false;
-
-        function playNeedleSound() {
-            if (isMuted || !audioCtx || audioCtx.state === 'suspended') return;
-            const speed = parseInt(speedRange.value);
-            if (speed > 15) return; // Smart-mute at high speeds
-
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain); gain.connect(audioCtx.destination);
-
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(800 + Math.random() * 400, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
-            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
-
-            osc.start(); osc.stop(audioCtx.currentTime + 0.05);
-        }
-
-        function toggleMute() {
-            isMuted = !isMuted;
-            document.getElementById('muteBtn').innerText = isMuted ? "🔇" : "🔊";
-            if (!isMuted && audioCtx) audioCtx.resume();
-        }
-
-        // Sim Config
+        let isRunning = false;
+        let needles = [];
+        const lineSpacing = 60, needleLength = 60;
         let width, height;
-        const lineSpacing = 60; 
-        const needleLength = 60; 
-        let total = 0, crosses = 0, isRunning = false, needles = [];
 
         function init() {
             const size = Math.min(window.innerWidth - 40, 600);
             width = canvas.width = size;
             height = canvas.height = size;
+            initChart();
             resetSim();
         }
 
-        function resetSim() {
-            isRunning = false;
-            total = 0; crosses = 0; needles = [];
-            updateStats(); draw();
-            document.getElementById('btnStart').innerText = "Run Auto";
-            document.getElementById('btnStart').className = "primary";
+        function initChart() {
+            chart = new Chart(piChartCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Estimate',
+                        data: [],
+                        borderColor: '#ff9f43',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        tension: 0.2
+                    }, {
+                        label: 'True π',
+                        data: [],
+                        borderColor: 'rgba(255,255,255,0.2)',
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { min: 2.8, max: 3.5, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#8395a7' } },
+                        x: { display: false }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
         }
 
-        function dropNeedle() {
-            if (!audioCtx) audioCtx = new AudioContext();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
+        worker.onmessage = function(e) {
+            const { total, crosses, batch } = e.data;
+            document.getElementById('totalEl').innerText = total.toLocaleString();
+            document.getElementById('crossEl').innerText = crosses.toLocaleString();
+            
+            if (crosses > 0) {
+                const piEst = 2 * (total / crosses);
+                document.getElementById('piEl').innerText = piEst.toFixed(5);
+                document.getElementById('piEl').classList.toggle('close', Math.abs(piEst - Math.PI) < 0.01);
+                
+                // Update Chart every 100 drops to keep it smooth
+                if (total % 100 < parseInt(document.getElementById('speedRange').value)) {
+                    updateChart(total, piEst);
+                }
+            }
 
-            const x = Math.random() * width;
-            const y = Math.random() * height;
-            const angle = Math.random() * Math.PI;
+            if (batch.length > 0) {
+                needles = [...needles, ...batch].slice(-1000);
+                draw();
+                if(!isMuted && batch.length < 5) playSound();
+            }
+        };
 
-            const x1 = x - (needleLength / 2) * Math.cos(angle);
-            const y1 = y - (needleLength / 2) * Math.sin(angle);
-            const x2 = x + (needleLength / 2) * Math.cos(angle);
-            const y2 = y + (needleLength / 2) * Math.sin(angle);
+        function updateChart(total, piEst) {
+            chart.data.labels.push(total);
+            chart.data.datasets[0].data.push(piEst);
+            chart.data.datasets[1].data.push(Math.PI);
+            if (chart.data.labels.length > 50) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+                chart.data.datasets[1].data.shift();
+            }
+            chart.update('none');
+        }
 
-            const isCross = Math.floor(y1 / lineSpacing) !== Math.floor(y2 / lineSpacing);
-            if (isCross) crosses++;
-            total++;
+        function manualDrop() {
+            worker.postMessage({ type: 'MANUAL', width, height, lineSpacing, needleLength });
+        }
 
-            needles.push({ x1, y1, x2, y2, crosses: isCross });
-            if (needles.length > 2000) needles.shift();
+        function toggleSim() {
+            isRunning = !isRunning;
+            const btn = document.getElementById('btnStart');
+            if (isRunning) {
+                btn.innerText = "Pause";
+                btn.className = "stop";
+                worker.postMessage({ type: 'START', speed: parseInt(document.getElementById('speedRange').value) });
+            } else {
+                btn.innerText = "Run Auto";
+                btn.className = "primary";
+                worker.postMessage({ type: 'STOP' });
+            }
+        }
 
-            playNeedleSound();
-            if (!isRunning) draw();
-            updateStats();
+        function resetSim() {
+            worker.postMessage({ type: 'RESET' });
+            needles = [];
+            chart.data.labels = [];
+            chart.data.datasets[0].data = [];
+            chart.data.datasets[1].data = [];
+            chart.update();
+            draw();
+            document.getElementById('totalEl').innerText = "0";
+            document.getElementById('crossEl').innerText = "0";
+            document.getElementById('piEl').innerText = "0.0000";
         }
 
         function draw() {
@@ -233,39 +337,26 @@
             ctx.stroke();
 
             for (let n of needles) {
-                ctx.strokeStyle = n.crosses ? "#1dd1a1" : "rgba(255, 159, 67, 0.6)";
+                ctx.strokeStyle = n.crosses ? "#1dd1a1" : "rgba(255, 159, 67, 0.4)";
                 ctx.lineWidth = 2; ctx.beginPath();
                 ctx.moveTo(n.x1, n.y1); ctx.lineTo(n.x2, n.y2); ctx.stroke();
             }
         }
 
-        function updateStats() {
-            totalEl.innerText = total.toLocaleString();
-            crossEl.innerText = crosses.toLocaleString();
-            if (crosses > 0) {
-                const piEst = 2 * (total / crosses);
-                piEl.innerText = piEst.toFixed(5);
-                piEl.classList.toggle('close', Math.abs(piEst - Math.PI) < 0.01);
-            } else { piEl.innerText = "0.0000"; }
+        function playSound() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.frequency.setValueAtTime(800 + Math.random() * 200, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.05);
         }
 
-        function toggleSim() {
-            isRunning = !isRunning;
-            const btn = document.getElementById('btnStart');
-            btn.innerText = isRunning ? "Pause" : "Run Auto";
-            btn.className = isRunning ? "stop" : "primary";
-            if (isRunning) loop();
-        }
-
-        function loop() {
-            if (!isRunning) return;
-            const dpf = parseInt(speedRange.value);
-            for(let i=0; i<dpf; i++) dropNeedle();
-            draw();
-            requestAnimationFrame(loop);
-        }
-
+        function toggleMute() { isMuted = !isMuted; document.getElementById('muteBtn').innerText = isMuted ? "🔇" : "🔊"; }
         function toggleModal() { document.getElementById('modal').classList.toggle('active'); }
+
         init();
         window.addEventListener('resize', init);
     </script>
