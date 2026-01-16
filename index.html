@@ -105,7 +105,7 @@
         /* --- 4. TOP CORNER CONTROLS --- */
         /* Brand Corner (Top Left) */
         .brand-corner {
-            position: fixed;
+            position: absolute;
             top: 20px;
             left: 20px;
             display: flex;
@@ -427,27 +427,36 @@
             if (theme === 'dark') { themeToggleBtn.innerText = '🌙'; } 
             else { themeToggleBtn.innerText = '☀️'; }
         }
-        // --- SHARE BUTTON LOGIC ---
+      // --- SMART SHARE BUTTON LOGIC ---
 const shareBtn = document.getElementById('shareBtn');
 const shareTooltip = document.getElementById('shareTooltip');
 
-shareBtn.addEventListener('click', () => {
-    // 1. Copy URL to Clipboard
-    const url = window.location.href; // Gets the current page URL
+shareBtn.addEventListener('click', async () => {
+    // 1. Try Native Share (Mobile/Modern Browsers)
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'Simulating Statistics',
+                text: 'Check out these interactive stats simulations!',
+                url: window.location.href
+            });
+            return; // If successful, stop here (don't copy link)
+        } catch (err) {
+            console.log('Share canceled or failed', err);
+        }
+    }
+
+    // 2. Fallback: Copy to Clipboard (Desktop/Old Browsers)
+    const url = window.location.href;
     navigator.clipboard.writeText(url).then(() => {
-        
-        // 2. Show "Copied!" Tooltip
         shareTooltip.classList.add('show');
-        
-        // 3. Hide it after 2 seconds
         setTimeout(() => {
             shareTooltip.classList.remove('show');
         }, 2000);
-    }).catch(err => {
-        console.error('Failed to copy: ', err);
-    });
+    }).catch(err => console.error('Failed to copy', err));
 });
     </script>
 </body>
 </html>
+
 
