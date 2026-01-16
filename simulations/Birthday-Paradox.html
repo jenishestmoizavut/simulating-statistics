@@ -503,19 +503,28 @@
             const text = document.getElementById('win-text');
             const emoji = document.getElementById('win-emoji');
 
-            if (count <= 12) {
+           if (count <= 5) {
+                emoji.innerText = "🤯";
+                title.innerText = "WHAT?!?! IMPOSSIBLE!";
+                text.innerHTML = `AMAZING QEFABGVIKJDV YOOOOO!<br>You found a match in only <strong>${count} people</strong>.<br>The odds of this were practically zero!`;
+            } else if (count <= 12) {
                 emoji.innerText = "🦄";
-                title.innerText = "IMPOSSIBLE!";
-                text.innerHTML = `You found a match in only <span class="highlight-stat">${count}</span> people.<br>The odds of this are tiny!`;
+                title.innerText = "Super Rare!";
+                text.innerHTML = `Wow! Only <strong>${count} people</strong>?<br>You are extremely lucky today.`;
             } else if (count < 23) {
                 emoji.innerText = "🍀";
-                title.innerText = "Lucky!";
-                text.innerHTML = `Matched at <span class="highlight-stat">${count}</span>.<br>Beat the statistics (avg 23).`;
+                title.innerText = "Lucky You!";
+                text.innerHTML = `You found a match with <strong>${count} people</strong>.<br>That's faster than the statistical average (23).`;
+            } else if (count <= 40) {
+                emoji.innerText = "🤓";
+                title.innerText = "Math Works!";
+                text.innerHTML = `Match found at <strong>${count} people</strong>.<br>This is exactly where statistics says it should happen.`;
             } else {
-                emoji.innerText = "📊";
-                title.innerText = "Statistics Win";
-                text.innerHTML = `Matched at <span class="highlight-stat">${count}</span>.<br>Math works!`;
+                emoji.innerText = "🐢";
+                title.innerText = "Finally!";
+                text.innerHTML = `It took <strong>${count} people</strong>.<br>A bit unlucky, but it happens!`;
             }
+
             toggleWin();
         }
 
@@ -526,3 +535,4 @@
     </script>
 </body>
 </html>
+
