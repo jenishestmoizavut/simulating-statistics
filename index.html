@@ -209,18 +209,67 @@
             60% { transform: rotate( 0.0deg) }
             100% { transform: rotate( 0.0deg) }
         }
+/* --- SHARE BUTTON & TOOLTIP --- */
+.share-container {
+    position: fixed;
+    top: 20px;
+    right: 80px; /* Positioned to the left of the Theme Toggle */
+    z-index: 100;
+}
 
+.share-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+}
+
+.share-btn:hover {
+    transform: scale(1.1);
+    background: var(--accent); /* Highlight on hover */
+    color: white;
+    border-color: var(--accent);
+}
+
+/* The "Copied!" Tooltip */
+.share-tooltip {
+    position: absolute;
+    top: 55px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2d3436;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    white-space: nowrap;
+}
+
+/* Show state */
+.share-tooltip.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(5px);
+}
         footer { margin-top: auto; padding-top: 50px; color: var(--footer-color); font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
     <div class="brand-corner">
-        <a href="#" class="brand-link">
-            <img src="favicon.ico" alt="Sim Stats Logo" class="brand-logo-img">
-            <span class="brand-text">Simulating Statistics</span>
-        </a>
-
+      
         <a href="https://jenishestmoizavut.github.io/attrack/" target="_blank" class="brand-link">
             <img src="attrack-logo.png" alt="Attrack Logo" class="brand-logo-img">
             <div>
@@ -229,7 +278,13 @@
             </div>
         </a>
     </div>
+<div class="share-container">
+    <button class="share-btn" id="shareBtn" aria-label="Share this page">
+        🔗 </button>
+    <div class="share-tooltip" id="shareTooltip">Copied!</div>
+</div>
 
+<button class="theme-toggle-btn" id="themeToggle" ... >
     <button class="theme-toggle-btn" id="themeToggle" aria-label="Toggle Dark Mode">
         ☀️
     </button>
@@ -372,6 +427,27 @@
             if (theme === 'dark') { themeToggleBtn.innerText = '🌙'; } 
             else { themeToggleBtn.innerText = '☀️'; }
         }
+        // --- SHARE BUTTON LOGIC ---
+const shareBtn = document.getElementById('shareBtn');
+const shareTooltip = document.getElementById('shareTooltip');
+
+shareBtn.addEventListener('click', () => {
+    // 1. Copy URL to Clipboard
+    const url = window.location.href; // Gets the current page URL
+    navigator.clipboard.writeText(url).then(() => {
+        
+        // 2. Show "Copied!" Tooltip
+        shareTooltip.classList.add('show');
+        
+        // 3. Hide it after 2 seconds
+        setTimeout(() => {
+            shareTooltip.classList.remove('show');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
+});
     </script>
 </body>
 </html>
+
