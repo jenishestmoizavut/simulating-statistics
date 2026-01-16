@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Galton Board Sim<link rel="icon" href="../favicon.ico">
-</title>
+    <title>Galton Board Sim</title>
+    <link rel="icon" href="../favicon.ico">
     <style>
         :root {
             --bg-color: #222f3e; /* Clean Dark Blue-Grey */
@@ -74,16 +74,12 @@
             display: block;
             border-radius: 10px;
         }
-order {
-display: block;
-font-size: 1.2rem;
-}
     </style>
 </head>
 <body>
 
     <h1>The Galton Board</h1>
-    <p class="subtitle"><h2><div id="order">Order from Chaos - The longer you run it, the better it gets ;)</p></h3>
+    <p class="subtitle" id="order">Order from Chaos - The longer you run it, the better it gets ;)</p>
 
     <div class="controls">
         <button onclick="spawnBall()">+ Drop 1</button>
@@ -99,7 +95,7 @@ font-size: 1.2rem;
         const canvas = document.getElementById('board');
         const ctx = canvas.getContext('2d');
 
-        // --- PHYSICS SETTINGS (The "Wide Curve" Logic) ---
+        // --- PHYSICS SETTINGS ---
         const rows = 12; 
         const gravity = 0.25;      
         const elasticity = 0.3;     
@@ -132,10 +128,11 @@ font-size: 1.2rem;
             // Sections
             hopperHeight = spacing * 3; 
             const triangleHeight = rows * spacing;
-            binAreaHeight = (ballSize * 2) * 15; 
+            binAreaHeight = (ballSize * 2) * 15; // Initially show space for 15 balls
             pegAreaHeight = hopperHeight + triangleHeight;
             height = pegAreaHeight + binAreaHeight;
             
+            // Adjust for small screens
             if (height > window.innerHeight - 200) {
                 const diff = height - (window.innerHeight - 200);
                 binAreaHeight -= diff;
@@ -185,7 +182,6 @@ font-size: 1.2rem;
                 y: 10,
                 vx: (Math.random() - 0.5) * 1, 
                 vy: 0,
-                // Clean Flat Colors
                 color: `hsl(${Math.random() * 40 + 190}, 90%, 65%)`, 
                 active: true
             });
@@ -199,6 +195,7 @@ font-size: 1.2rem;
                 btn.innerText = "🌊 Flood Gates";
                 btn.classList.remove('active');
             } else {
+                spawnBall(); // Immediate spawn
                 floodInterval = setInterval(spawnBall, 30); 
                 btn.innerText = "🛑 Stop";
                 btn.classList.add('active');
@@ -280,7 +277,7 @@ font-size: 1.2rem;
         function draw() {
             ctx.clearRect(0, 0, width, height);
 
-            // 1. Draw Funnel (Subtle)
+            // 1. Draw Funnel
             ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
             ctx.beginPath();
             ctx.moveTo(0, 0);
@@ -293,7 +290,7 @@ font-size: 1.2rem;
             ctx.lineTo(0, hopperHeight);
             ctx.fill();
 
-            // 2. Draw Pegs (Clean Grey Dots)
+            // 2. Draw Pegs
             ctx.fillStyle = '#8395a7';
             for (let p of pegs) {
                 ctx.beginPath();
@@ -301,7 +298,7 @@ font-size: 1.2rem;
                 ctx.fill();
             }
 
-            // 3. Draw Bin Guides (Very Faint)
+            // 3. Draw Bin Guides
             ctx.strokeStyle = '#2f3640'; 
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -313,10 +310,12 @@ font-size: 1.2rem;
             }
             ctx.stroke();
 
-            // 4. Draw Stacks (Flat & Clean)
-            let ySpacing = ballSize * 2;
+            // 4. Draw Stacks (Scalable)
+            let ySpacing = ballSize * 2; // Default height of a ball
             const maxAllowedPixels = height - pegAreaHeight - 5;
             const currentTallestPixels = maxStackHeight * ySpacing;
+            
+            // If stacks get too tall, shrink them to fit
             if (currentTallestPixels > maxAllowedPixels) {
                 ySpacing = maxAllowedPixels / maxStackHeight;
             }
@@ -329,7 +328,6 @@ font-size: 1.2rem;
                 for (let j = 0; j < count; j++) {
                     const yPos = height - ballSize - (j * ySpacing) - 2; 
                     
-                    // Simple Color Shift
                     const hue = 190 + (j * 2); 
                     ctx.fillStyle = `hsl(${hue}, 80%, 60%)`;
                     
@@ -337,11 +335,13 @@ font-size: 1.2rem;
                     ctx.ellipse(xPos, yPos, ballSize, ballSize * (ySpacing/(ballSize*2)), 0, 0, Math.PI * 2);
                     ctx.fill();
                     
-                    // Subtle Shine
-                    ctx.fillStyle = 'rgba(255,255,255,0.2)';
-                    ctx.beginPath();
-                    ctx.ellipse(xPos - ballSize*0.3, yPos - ballSize*0.3, ballSize/3, ballSize/3, 0, 0, Math.PI*2);
-                    ctx.fill();
+                    // Shine
+                    if (ySpacing > 2) { // Only draw detail if big enough
+                        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                        ctx.beginPath();
+                        ctx.ellipse(xPos - ballSize*0.3, yPos - ballSize*0.3, ballSize/3, ballSize/3, 0, 0, Math.PI*2);
+                        ctx.fill();
+                    }
                 }
             }
 
@@ -351,6 +351,36 @@ font-size: 1.2rem;
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, ballSize, 0, Math.PI * 2);
                 ctx.fill();
+            }
+
+            // 6. --- NEW: Dynamic Y-Axis & Grid ---
+            // Calculate how many balls fit in the current visible height
+            const visibleCapacity = Math.floor(maxAllowedPixels / ySpacing);
+            
+            // Smart step calculation (5, 10, 20, 50, etc.)
+            let step = 5;
+            if (visibleCapacity > 25) step = 10;
+            if (visibleCapacity > 50) step = 25;
+            if (visibleCapacity > 100) step = 50;
+            if (visibleCapacity > 250) step = 100;
+
+            ctx.textAlign = "left";
+            ctx.textBaseline = "bottom";
+            ctx.font = "bold 11px monospace";
+            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+
+            for (let c = step; c <= visibleCapacity; c += step) {
+                const yPos = height - (c * ySpacing);
+                
+                // Draw Grid Line
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.1)"; // Very faint line
+                ctx.moveTo(0, yPos);
+                ctx.lineTo(width, yPos);
+                ctx.stroke();
+
+                // Draw Label (with slight shadow for readability)
+                ctx.fillText(c, 5, yPos - 2);
             }
         }
 
@@ -373,5 +403,4 @@ font-size: 1.2rem;
 
     </script>
 </body>
-
 </html>
