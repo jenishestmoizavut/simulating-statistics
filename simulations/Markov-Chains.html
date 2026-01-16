@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Markov Chain</title>
+    <title>Markov Chain Studio</title>
     <link rel="icon" href="../favicon.ico">
     <style>
         :root {
@@ -11,7 +11,7 @@
             --bg-grad-2: #2a5298;
             --card-bg: rgba(255, 255, 255, 0.1);
             --text-color: #ffffff;
-            --accent-color: #00d2d3;
+            --accent-color: #f1c40f;
         }
 
         body {
@@ -30,22 +30,28 @@
         .controls-top {
             background: rgba(0,0,0,0.3); padding: 10px 20px; border-radius: 50px;
             display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center;
-            margin-bottom: 20px; backdrop-filter: blur(10px);
+            margin-bottom: 30px; backdrop-filter: blur(10px);
+            z-index: 100;
         }
 
         select, button {
-            background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.2);
             padding: 8px 15px; border-radius: 20px; cursor: pointer; font-size: 0.9rem;
             transition: all 0.2s;
         }
-        select:focus, button:hover { background: rgba(255,255,255,0.2); outline: none; }
+        
+        /* FIX: Dropdown colors for all browsers */
+        select option { background-color: #2c3e50; color: white; }
+        
+        select:focus, button:hover { background: rgba(255,255,255,0.25); outline: none; transform: translateY(-1px); }
         .btn-action { background: var(--accent-color); color: #2c3e50; font-weight: bold; border: none; }
         .btn-action:active { transform: scale(0.95); }
 
-        /* --- STAGE (The Graph) --- */
+        /* --- STAGE CONTAINER --- */
         .stage-container {
-            position: relative; width: 100%; max-width: 500px; height: 400px;
-            margin-bottom: 20px;
+            position: relative; width: 100%; max-width: 700px; min-height: 350px;
+            margin-bottom: 30px;
+            display: flex; justify-content: center; align-items: center;
         }
         
         .svg-layer {
@@ -53,85 +59,103 @@
             pointer-events: none; z-index: 0;
         }
         
-        /* Arrows */
         path {
-            fill: none; stroke: rgba(255,255,255,0.1); stroke-width: 1;
-            transition: stroke 0.2s;
+            fill: none; stroke: rgba(255,255,255,0.2); stroke-width: 2;
+            transition: stroke 0.3s;
         }
         path.active-path {
-            stroke: var(--accent-color); stroke-width: 3;
-            filter: drop-shadow(0 0 5px var(--accent-color));
+            stroke: var(--accent-color); stroke-width: 4;
+            filter: drop-shadow(0 0 8px var(--accent-color));
         }
 
-        /* Nodes */
+        /* --- NODES (The "Boxes") --- */
         .node {
-            position: absolute; width: 80px; height: 80px;
-            border-radius: 50%; background: var(--card-bg);
-            border: 2px solid rgba(255,255,255,0.3);
+            background: var(--card-bg);
+            border: 2px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            backdrop-filter: blur(5px);
-            transition: transform 0.2s, background-color 0.2s;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 10;
-            transform: translate(-50%, -50%); /* Center on coordinates */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
         }
         .node.active {
-            transform: translate(-50%, -50%) scale(1.2);
-            border-color: #fff; background: rgba(255,255,255,0.2);
-            box-shadow: 0 0 20px rgba(255,255,255,0.3);
+            transform: scale(1.1);
+            border-color: #fff; background: rgba(255,255,255,0.25);
+            box-shadow: 0 0 30px rgba(255,255,255,0.4);
             z-index: 20;
         }
-        .node-icon { font-size: 2rem; }
-        .node-label { font-size: 0.7rem; font-weight: bold; margin-top: 2px; text-transform: uppercase; }
+        .node-icon { font-size: 2.5rem; margin-bottom: 5px; }
+        .node-label { font-size: 0.9rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* --- STATS --- */
+        /* --- LAYOUT MODES --- */
+        
+        /* 1. CLASSIC 2-STATE LAYOUT */
+        .layout-classic .node {
+            width: 140px; height: 140px; border-radius: 20px;
+            position: absolute; top: 50%; transform: translateY(-50%);
+        }
+        /* Positions for Left/Right boxes */
+        .layout-classic .node:nth-child(1) { left: 10%; } /* Node 0 */
+        .layout-classic .node:nth-child(2) { right: 10%; } /* Node 1 */
+        
+        /* 2. CIRCLE N-STATE LAYOUT */
+        .layout-circle .node {
+            width: 100px; height: 100px; border-radius: 50%; /* Circle nodes for 3+ */
+            position: absolute; transform: translate(-50%, -50%);
+        }
+        .layout-circle .node-icon { font-size: 2rem; }
+        .layout-circle .node-label { font-size: 0.7rem; }
+
+        /* --- STATS GRID --- */
         .stats-grid {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 10px; width: 100%; max-width: 600px; margin-bottom: 20px;
+            gap: 15px; width: 100%; max-width: 600px; margin-bottom: 20px;
         }
         .stat-card {
-            background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; text-align: center;
-            border-bottom: 3px solid transparent;
+            background: rgba(0,0,0,0.2); padding: 15px; border-radius: 15px; text-align: center;
+            border-bottom: 4px solid transparent; transition: background 0.2s;
         }
-        .stat-val { font-size: 1.2rem; font-weight: bold; }
-        .stat-name { font-size: 0.8rem; opacity: 0.7; }
+        .stat-card:hover { background: rgba(0,0,0,0.3); }
+        .stat-val { font-size: 1.4rem; font-weight: bold; font-family: monospace; }
+        .stat-name { font-size: 0.8rem; opacity: 0.7; margin-bottom: 5px; }
 
-        /* --- MODAL --- */
+        /* --- MODALS --- */
         .modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 100;
+            background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 200;
         }
         .modal.open { display: flex; }
         .modal-content {
-            background: #2c3e50; padding: 30px; border-radius: 20px; max-width: 500px; color: white;
+            background: #2c3e50; padding: 30px; border-radius: 20px; max-width: 500px; width: 90%; color: white;
             box-shadow: 0 20px 50px rgba(0,0,0,0.5); position: relative;
         }
         textarea {
-            width: 100%; height: 150px; background: rgba(0,0,0,0.3); color: lime; 
-            border: 1px solid #555; padding: 10px; font-family: monospace; border-radius: 5px;
-            margin: 10px 0;
+            width: 100%; height: 120px; background: rgba(0,0,0,0.3); color: #00cec9; 
+            border: 1px solid #555; padding: 10px; font-family: monospace; border-radius: 5px; margin: 10px 0;
+            box-sizing: border-box;
         }
-        
         .close-btn { position: absolute; top: 15px; right: 20px; font-size: 1.5rem; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <h1>Markov Chain Sim</h1>
-    <p class="subtitle">Visualizing state transitions over time</p>
+    <h1>Markov Chain Studio</h1>
+    <p class="subtitle">Simulating random walks through state spaces</p>
 
     <div class="controls-top">
         <select id="presetSelect" onchange="loadPreset()">
             <option value="weather">2-State: Weather</option>
+            <option value="brand">2-State: Brand Loyalty</option>
             <option value="life">3-State: Eat Sleep Code</option>
-            <option value="gamble">2-State: Gambler</option>
+            <option value="rps">3-State: Rock Paper Scissors</option>
             <option value="custom">Custom Matrix...</option>
         </select>
         
-        <button onclick="toggleInfo()">ℹ️ Explain</button>
-        <button onclick="toggleMute()" id="muteBtn">🔊</button>
+        <button onclick="toggleInfo()" title="Learn more">ℹ️</button>
+        <button onclick="toggleMute()" id="muteBtn" title="Sound">🔊</button>
     </div>
 
-    <div class="stage-container" id="stage">
+    <div class="stage-container layout-classic" id="stage">
         <svg class="svg-layer" id="svgLayer">
             <defs>
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="28" refY="3.5" orient="auto">
@@ -144,13 +168,13 @@
     <div class="stats-grid" id="statsGrid"></div>
 
     <div style="text-align:center; font-family: monospace; opacity: 0.6; margin-bottom: 20px;">
-        Steps: <span id="stepCount">0</span>
+        TOTAL STEPS: <span id="stepCount">0</span>
     </div>
 
     <div class="controls-top">
         <button class="btn-action" onclick="manualStep()">+1 Step</button>
         <button class="btn-action" id="runBtn" onclick="toggleRun()">Run Fast</button>
-        <div style="display:flex; flex-direction:column; align-items:center;">
+        <div style="display:flex; flex-direction:column; align-items:center; margin-left: 5px;">
             <span style="font-size:0.6rem;">SPEED</span>
             <input type="range" id="speedRange" min="1" max="100" value="10">
         </div>
@@ -160,37 +184,37 @@
     <div class="modal" id="infoModal">
         <div class="modal-content">
             <span class="close-btn" onclick="toggleInfo()">&times;</span>
-            <h2>What is a Markov Chain?</h2>
-            <p>It's a mathematical system that hops from one "State" to another according to fixed probability rules.</p>
-            <p><strong>The Golden Rule (Memoryless):</strong><br>
-            The future depends <em>only</em> on where you are right now, not where you were before. The past doesn't matter!</p>
-            <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1); margin: 20px 0;">
-            <p><strong>Try it:</strong><br>Select "Custom Matrix" to input your own probabilities and see what happens!</p>
+            <h2>Understanding the Chain</h2>
+            <p>A Markov Chain is a system that transitions from one state to another purely based on probability.</p>
+            <ul>
+                <li><strong>Memoryless:</strong> It doesn't care about the past. Only the current state decides what happens next.</li>
+                <li><strong>Stationarity:</strong> Run it long enough, and the percentages often settle into a stable "equilibrium" (the Stationary Distribution).</li>
+            </ul>
         </div>
     </div>
 
     <div class="modal" id="customModal">
         <div class="modal-content">
             <span class="close-btn" onclick="document.getElementById('customModal').classList.remove('open')">&times;</span>
-            <h2>Custom Matrix</h2>
-            <p>Enter a Transition Matrix (rows must sum to 1). Format: JSON.</p>
+            <h2>Custom Matrix Input</h2>
+            <p style="font-size:0.9rem; opacity:0.8;">Enter a square JSON matrix (rows sum to 1.0).</p>
+            
             <textarea id="matrixInput" spellcheck="false">
 [
-  [0.5, 0.25, 0.25], 
-  [0.25, 0.5, 0.25], 
-  [0.25, 0.25, 0.5]
+  [0.5, 0.5], 
+  [0.5, 0.5]
 ]</textarea>
-            <div style="margin-bottom: 10px;">
-                <label>Labels (comma separated):</label><br>
-                <input type="text" id="labelsInput" value="A, B, C" style="width:100%; padding:8px; margin-top:5px; background:rgba(0,0,0,0.3); color:white; border:1px solid #555;">
-            </div>
-            <button class="btn-action" onclick="applyCustom()">Load Matrix</button>
+            
+            <label style="font-size:0.8rem;">Labels (comma separated):</label>
+            <input type="text" id="labelsInput" value="A, B" style="width:100%; padding:8px; margin-top:5px; background:rgba(0,0,0,0.3); color:white; border:1px solid #555; border-radius: 5px; box-sizing: border-box;">
+            
+            <button class="btn-action" style="margin-top:15px; width:100%;" onclick="applyCustom()">Load Simulation</button>
             <p id="errorMsg" style="color: #ff7675; font-size: 0.8rem; margin-top: 10px;"></p>
         </div>
     </div>
 
     <script>
-        // --- DATA ---
+        // --- PRESETS DATABASE ---
         const presets = {
             weather: {
                 labels: ["Sunny", "Rainy"],
@@ -198,25 +222,31 @@
                 matrix: [[0.7, 0.3], [0.4, 0.6]],
                 colors: ["#f1c40f", "#3498db"]
             },
+            brand: {
+                labels: ["Coke", "Pepsi"],
+                icons: ["🥤", "🟦"],
+                matrix: [[0.9, 0.1], [0.2, 0.8]], // Sticky brands
+                colors: ["#e74c3c", "#3498db"]
+            },
             life: {
                 labels: ["Eat", "Sleep", "Code"],
                 icons: ["🍔", "💤", "💻"],
                 matrix: [
-                    [0.2, 0.1, 0.7], // Eat -> mostly Code
-                    [0.1, 0.5, 0.4], // Sleep -> mostly Sleep or Code
-                    [0.3, 0.3, 0.4]  // Code -> balanced
+                    [0.1, 0.2, 0.7], // Eat -> Code usually
+                    [0.1, 0.6, 0.3], // Sleep -> Sleep more
+                    [0.3, 0.2, 0.5]  // Code -> Loop
                 ],
                 colors: ["#e67e22", "#9b59b6", "#2ecc71"]
             },
-            gamble: {
-                labels: ["Win", "Loss"],
-                icons: ["🤑", "💸"],
-                matrix: [[0.45, 0.55], [0.45, 0.55]], // House edge
-                colors: ["#2ecc71", "#e74c3c"]
+            rps: {
+                labels: ["Rock", "Paper", "Scissors"],
+                icons: ["🪨", "📄", "✂️"],
+                matrix: [[0.33, 0.33, 0.34], [0.34, 0.33, 0.33], [0.33, 0.34, 0.33]],
+                colors: ["#95a5a6", "#ecf0f1", "#e74c3c"]
             }
         };
 
-        // --- STATE ---
+        // --- GLOBAL STATE ---
         let currentConfig = null;
         let currentState = 0;
         let counts = [];
@@ -224,36 +254,36 @@
         let isRunning = false;
         let animFrame;
         
-        // --- AUDIO ---
+        // --- AUDIO ENGINE ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContext();
         let isMuted = false;
 
-        function playSound(stateIndex) {
+        function playSound(idx) {
             if (isMuted || audioCtx.state === 'suspended') return;
             const speed = parseInt(document.getElementById('speedRange').value);
-            if(speed > 30) return; // Mute if too fast
+            if(speed > 40) return; // Save ears
 
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain);
             gain.connect(audioCtx.destination);
 
-            // Pentatonic mapping based on state index
-            const baseFreq = 220;
-            const mult = [1, 1.12, 1.25, 1.5, 1.66]; // Scale ratios
-            const freq = baseFreq * (mult[stateIndex % 5] || 2);
+            // Pentatonic scale logic
+            const base = 220;
+            const ratios = [1, 1.125, 1.25, 1.5, 1.66];
+            const freq = base * (ratios[idx % 5] || 2);
 
             osc.type = 'sine';
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
             gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
 
             osc.start();
-            osc.stop(audioCtx.currentTime + 0.1);
+            osc.stop(audioCtx.currentTime + 0.15);
         }
 
-        // --- INIT & GRAPHICS ---
+        // --- CORE FUNCTIONS ---
         function loadPreset() {
             const val = document.getElementById('presetSelect').value;
             if(val === 'custom') {
@@ -269,13 +299,12 @@
             
             try {
                 const mat = JSON.parse(txt);
-                // Basic validation
-                if(!Array.isArray(mat) || mat.length !== mat[0].length) throw new Error("Matrix must be square array");
+                if(!Array.isArray(mat) || mat.length < 2) throw new Error("Matrix must be array of size 2+");
                 
-                // Build Config object
+                // Construct config
                 const cfg = {
                     labels: lbls.slice(0, mat.length),
-                    icons: mat.map((_,i) => String.fromCharCode(65+i)), // A, B, C icons
+                    icons: mat.map((_, i) => String.fromCharCode(65+i)), // A, B, C default icons
                     matrix: mat,
                     colors: mat.map((_,i) => `hsl(${i * (360/mat.length)}, 70%, 50%)`)
                 };
@@ -293,137 +322,174 @@
             totalSteps = 0;
             counts = new Array(config.matrix.length).fill(0);
             
-            renderGraph();
-            renderStats();
+            renderLayout(config);
+            renderStats(config);
             updateStatsUI();
         }
 
-        function renderGraph() {
+        function renderLayout(config) {
             const stage = document.getElementById('stage');
             const svg = document.getElementById('svgLayer');
-            const num = currentConfig.matrix.length;
             
-            // Clear old
-            document.querySelectorAll('.node').forEach(e => e.remove());
+            // Clear
+            // Keep the svgLayer, remove other children (nodes)
+            Array.from(stage.children).forEach(c => {
+                if(c.id !== 'svgLayer') stage.removeChild(c);
+            });
             svg.innerHTML = '<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="28" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,255,255,0.3)" /></marker></defs>';
 
+            // Switch Class based on count
+            const count = config.matrix.length;
+            if (count === 2) {
+                stage.className = "stage-container layout-classic";
+                renderClassicNodes(config);
+            } else {
+                stage.className = "stage-container layout-circle";
+                renderCircleNodes(config);
+            }
+        }
+
+        function renderClassicNodes(config) {
+            const stage = document.getElementById('stage');
+            
+            // 1. Create Nodes (DOM)
+            config.labels.forEach((lbl, i) => {
+                const node = document.createElement('div');
+                node.className = 'node';
+                node.id = `node-${i}`;
+                node.style.borderColor = config.colors[i];
+                node.innerHTML = `<div class="node-icon">${config.icons[i]}</div><div class="node-label">${lbl}</div>`;
+                stage.appendChild(node);
+            });
+
+            // 2. Create SVG Paths (Hardcoded beautiful curves for 2-state)
+            // We wait a tick for DOM layout or just assume % positions
+            // Classic Layout: Node 0 is Left (10%), Node 1 is Right (10%)
+            // We can assume stage width ~ 700px. Let's use coordinate logic relative to stage.
+            
+            setTimeout(() => { drawPaths(true); }, 50);
+        }
+
+        function renderCircleNodes(config) {
+            const stage = document.getElementById('stage');
+            const count = config.matrix.length;
+            const r = 130; // Radius
             const cx = stage.clientWidth / 2;
             const cy = stage.clientHeight / 2;
-            const r = Math.min(cx, cy) - 60; // Radius
 
-            // 1. Create Nodes
-            for(let i=0; i<num; i++) {
-                const angle = (i / num) * 2 * Math.PI - (Math.PI/2); // Start top
+            config.labels.forEach((lbl, i) => {
+                const angle = (i / count) * 2 * Math.PI - (Math.PI/2);
                 const x = cx + r * Math.cos(angle);
                 const y = cy + r * Math.sin(angle);
-
+                
                 const node = document.createElement('div');
                 node.className = 'node';
                 node.id = `node-${i}`;
                 node.style.left = x + 'px';
                 node.style.top = y + 'px';
-                node.style.borderColor = currentConfig.colors[i];
-                node.innerHTML = `
-                    <div class="node-icon">${currentConfig.icons[i] || '#'}</div>
-                    <div class="node-label">${currentConfig.labels[i]}</div>
-                `;
+                node.style.borderColor = config.colors[i];
+                node.innerHTML = `<div class="node-icon">${config.icons[i]}</div><div class="node-label">${lbl}</div>`;
                 stage.appendChild(node);
-            }
+            });
 
-            // 2. Create Paths (Full Mesh)
+            setTimeout(() => { drawPaths(false); }, 50);
+        }
+
+        function drawPaths(isClassic) {
+            const stage = document.getElementById('stage');
+            const svg = document.getElementById('svgLayer');
+            const num = currentConfig.matrix.length;
+
+            // Helper to get center of a node
+            const getCenter = (idx) => {
+                const el = document.getElementById(`node-${idx}`);
+                return {
+                    x: el.offsetLeft + el.offsetWidth/2,
+                    y: el.offsetTop + el.offsetHeight/2,
+                    w: el.offsetWidth
+                };
+            };
+
             for(let i=0; i<num; i++) {
                 for(let j=0; j<num; j++) {
                     if(currentConfig.matrix[i][j] > 0) {
-                        createPath(i, j, num, cx, cy, r);
+                        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        path.id = `path-${i}-${j}`;
+                        path.setAttribute("marker-end", "url(#arrowhead)");
+                        
+                        const p1 = getCenter(i);
+                        const p2 = getCenter(j);
+                        let d = "";
+
+                        if (isClassic) {
+                            // Specialized 2-state curves
+                            if (i===j) {
+                                // Self Loop
+                                const dir = i===0 ? -1 : 1;
+                                d = `M ${p1.x} ${p1.y - 40} C ${p1.x + (50*dir)} ${p1.y - 100}, ${p1.x - (50*dir)} ${p1.y - 100}, ${p1.x} ${p1.y - 40}`; 
+                                // Actually, self loops are tricky in pure SVG paths on DOM elements. 
+                                // Let's do simple loops.
+                                d = i===0 
+                                    ? `M ${p1.x-20} ${p1.y-50} C ${p1.x-80} ${p1.y-100}, ${p1.x-80} ${p1.y+20}, ${p1.x-40} ${p1.y}`
+                                    : `M ${p2.x+20} ${p2.y-50} C ${p2.x+80} ${p2.y-100}, ${p2.x+80} ${p2.y+20}, ${p2.x+40} ${p2.y}`;
+                            } else {
+                                // Cross arrows
+                                if (i===0) d = `M ${p1.x+40} ${p1.y-20} Q ${(p1.x+p2.x)/2} ${p1.y-80} ${p2.x-40} ${p2.y-20}`; // Top arch
+                                else       d = `M ${p1.x-40} ${p1.y+20} Q ${(p1.x+p2.x)/2} ${p1.y+80} ${p2.x+40} ${p2.y+20}`; // Bottom arch
+                            }
+                        } else {
+                            // General N-state lines
+                            if(i===j) {
+                                // Simple self loop bubble
+                                d = `M ${p1.x} ${p1.y-40} C ${p1.x+50} ${p1.y-100}, ${p1.x-50} ${p1.y-100}, ${p1.x} ${p1.y-40}`;
+                            } else {
+                                // Straight lines for clarity in complex graphs
+                                d = `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
+                            }
+                        }
+                        
+                        path.setAttribute("d", d);
+                        svg.appendChild(path);
                     }
                 }
             }
-            
             highlightNode(0);
         }
 
-        function createPath(from, to, total, cx, cy, r) {
-            const svg = document.getElementById('svgLayer');
-            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.id = `path-${from}-${to}`;
-            path.setAttribute("marker-end", "url(#arrowhead)");
-
-            // Coords
-            const ang1 = (from / total) * 2 * Math.PI - (Math.PI/2);
-            const ang2 = (to / total) * 2 * Math.PI - (Math.PI/2);
-            
-            const x1 = cx + r * Math.cos(ang1);
-            const y1 = cy + r * Math.sin(ang1);
-            const x2 = cx + r * Math.cos(ang2);
-            const y2 = cy + r * Math.sin(ang2);
-
-            let d = "";
-            if(from === to) {
-                // Self Loop (Curve out and back)
-                const loopR = 40;
-                const lx = x1 + loopR * Math.cos(ang1);
-                const ly = y1 + loopR * Math.sin(ang1);
-                d = `M ${x1} ${y1} Q ${lx} ${ly} ${x1+5} ${y1+5}`; // Simplified loop
-                // Actually self-loops in SVG are tricky without bezier control points pointing out
-                // Let's just point it outwards
-                const cx1 = x1 + 60 * Math.cos(ang1 - 0.3);
-                const cy1 = y1 + 60 * Math.sin(ang1 - 0.3);
-                const cx2 = x1 + 60 * Math.cos(ang1 + 0.3);
-                const cy2 = y1 + 60 * Math.sin(ang1 + 0.3);
-                d = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x1} ${y1}`;
-            } else {
-                // Curve towards center slightly to avoid overlapping straight lines
-                // or curve outwards? Let's do simple straight for now, quadratic for style
-                d = `M ${x1} ${y1} L ${x2} ${y2}`;
-            }
-            
-            path.setAttribute("d", d);
-            svg.appendChild(path);
-        }
-
-        function renderStats() {
+        function renderStats(config) {
             const grid = document.getElementById('statsGrid');
             grid.innerHTML = '';
-            currentConfig.labels.forEach((lbl, i) => {
+            config.labels.forEach((lbl, i) => {
                 const div = document.createElement('div');
                 div.className = 'stat-card';
-                div.style.borderBottomColor = currentConfig.colors[i];
-                div.innerHTML = `
-                    <div class="stat-name">${lbl}</div>
-                    <div class="stat-val" id="val-${i}">0%</div>
-                `;
+                div.style.borderBottomColor = config.colors[i];
+                div.innerHTML = `<div class="stat-name">${lbl}</div><div class="stat-val" id="val-${i}">0%</div>`;
                 grid.appendChild(div);
             });
         }
 
-        // --- LOGIC ---
+        // --- SIMULATION LOGIC ---
         function step() {
-            // 1. Get Row
+            // Weighted Random Choice
             const row = currentConfig.matrix[currentState];
-            
-            // 2. Weighted Random
             const r = Math.random();
             let sum = 0;
-            let nextState = -1;
+            let next = -1;
             
             for(let i=0; i<row.length; i++) {
                 sum += row[i];
-                if(r < sum) {
-                    nextState = i;
-                    break;
-                }
+                if(r < sum) { next = i; break; }
             }
-            if(nextState === -1) nextState = row.length - 1; // Fallback
+            if(next === -1) next = row.length - 1; // Precision safety
 
-            // 3. Visuals
-            highlightTransition(currentState, nextState);
-            currentState = nextState;
+            // Visuals
+            highlightTransition(currentState, next);
+            currentState = next;
             
-            // 4. Data
+            // Data
             totalSteps++;
             counts[currentState]++;
             
-            // 5. UI Updates
             updateStatsUI();
             playSound(currentState);
             highlightNode(currentState);
@@ -433,52 +499,53 @@
             const p = document.getElementById(`path-${from}-${to}`);
             if(p) {
                 p.classList.add('active-path');
-                setTimeout(()=>p.classList.remove('active-path'), 200);
+                setTimeout(() => p.classList.remove('active-path'), 200);
             }
         }
 
         function highlightNode(idx) {
             document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
-            document.getElementById(`node-${idx}`).classList.add('active');
+            const n = document.getElementById(`node-${idx}`);
+            if(n) n.classList.add('active');
         }
 
         function updateStatsUI() {
-            document.getElementById('stepCount').innerText = totalSteps;
+            document.getElementById('stepCount').innerText = totalSteps.toLocaleString();
             counts.forEach((c, i) => {
                 const pct = totalSteps === 0 ? 0 : ((c/totalSteps)*100).toFixed(1);
                 document.getElementById(`val-${i}`).innerText = pct + "%";
             });
         }
 
-        // --- CONTROLS ---
+        // --- LOOP & CONTROL ---
         function toggleRun() {
             isRunning = !isRunning;
             const btn = document.getElementById('runBtn');
             if(isRunning) {
                 btn.innerText = "Pause";
-                btn.classList.add('btn-action');
+                btn.style.background = "#ff7675"; // Red for stop
                 if(audioCtx.state === 'suspended') audioCtx.resume();
                 loop();
             } else {
                 btn.innerText = "Run Fast";
+                btn.style.background = ""; // Reset
                 cancelAnimationFrame(animFrame);
             }
         }
 
         function loop() {
             if(!isRunning) return;
-            
             const speed = parseInt(document.getElementById('speedRange').value);
-            // Steps per frame logic
-            let steps = 1;
-            if(speed > 50) steps = Math.floor(Math.pow(speed-40, 1.5));
             
-            for(let i=0; i<steps; i++) step();
+            let stepsPerFrame = 1;
+            if(speed > 50) stepsPerFrame = Math.floor(Math.pow(speed-40, 1.6));
+            
+            for(let i=0; i<stepsPerFrame; i++) step();
 
             let delay = 0;
             if(speed < 40) delay = (40-speed) * 10;
             
-            if(delay > 0) setTimeout(()=> animFrame = requestAnimationFrame(loop), delay);
+            if(delay > 0) setTimeout(() => animFrame = requestAnimationFrame(loop), delay);
             else animFrame = requestAnimationFrame(loop);
         }
 
@@ -492,6 +559,7 @@
             isRunning = false;
             cancelAnimationFrame(animFrame);
             document.getElementById('runBtn').innerText = "Run Fast";
+            document.getElementById('runBtn').style.background = "";
             setup(currentConfig);
         }
 
@@ -502,7 +570,8 @@
         }
 
         // Init
-        window.onload = () => loadPreset();
+        window.addEventListener('resize', () => { if(currentConfig) renderLayout(currentConfig); });
+        window.onload = loadPreset;
 
     </script>
 </body>
