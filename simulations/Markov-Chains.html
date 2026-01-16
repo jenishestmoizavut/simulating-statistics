@@ -3,487 +3,596 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markov Chain Simulator<link rel="icon" href="../favicon.ico">
-</title>
+    <title>Markov Chain Simulator</title>
+    <link rel="icon" href="../favicon.ico">
     <style>
         :root {
-            /* Dynamic Colors based on preset */
-            --bg-color: #f1c40f; 
-            --text-color: #ecf0f1;
-            --container-bg: rgba(0, 0, 0, 0.4);
-            --accent: #e67e22;
+            --bg-grad-1: #1e3c72;
+            --bg-grad-2: #2a5298;
+            --card-bg: rgba(255, 255, 255, 0.1);
+            --text-color: #ffffff;
+            --accent-color: #f1c40f;
+            --state-a-color: #f1c40f;
+            --state-b-color: #3498db;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, var(--bg-grad-1), var(--bg-grad-2));
             color: var(--text-color);
             margin: 0;
             padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             min-height: 100vh;
-            transition: background-color 0.5s ease;
-        }
-
-        h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-        p.subtitle { margin-top: 0; margin-bottom: 25px; opacity: 0.9; }
-
-        .main-stage {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
-            margin-bottom: 30px;
+            overflow-x: hidden;
+            transition: background 0.5s;
         }
 
-        /* Icon Animation */
-        .icon-display {
-            font-size: 5rem;
-            animation: float 3s ease-in-out infinite;
-            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
-            height: 100px; display: flex; align-items: center;
-        }
+        h1 { margin: 10px 0 5px; font-weight: 300; letter-spacing: 3px; text-transform: uppercase; }
+        .subtitle { font-size: 0.9rem; opacity: 0.7; margin-bottom: 30px; font-style: italic; }
 
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
-        }
-
-        /* Transition Diagram */
-        .diagram-container {
+        /* --- CONTROLS SECTION --- */
+        .controls-top {
+            background: rgba(0,0,0,0.3);
+            padding: 10px 20px;
+            border-radius: 50px;
             display: flex;
-            gap: 30px;
-            background: var(--container-bg);
-            padding: 20px 30px;
-            border-radius: 15px;
-            backdrop-filter: blur(5px);
+            gap: 15px;
             align-items: center;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        
-        .state-box {
-            text-align: center;
-            opacity: 0.4;
-            transition: all 0.2s;
-            transform: scale(0.9);
-            min-width: 100px;
-        }
-        .state-box.active {
-            opacity: 1;
-            transform: scale(1.1);
-            font-weight: bold;
-            text-shadow: 0 0 10px rgba(255,255,255,0.5);
-        }
-        .state-name { font-size: 1.2rem; margin-bottom: 5px; }
-        .arrow-label { font-size: 0.75rem; color: rgba(255,255,255,0.8); margin-top: 2px; }
 
-        /* Stats Bars */
-        .stats-container {
-            width: 100%; max-width: 600px;
-            background: var(--container-bg);
-            padding: 20px;
-            border-radius: 15px;
-            backdrop-filter: blur(5px);
+        select {
+            background: transparent;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        select:focus { outline: none; border-color: var(--accent-color); background: #2c3e50; }
+
+        .sound-toggle {
+            cursor: pointer;
+            font-size: 1.2rem;
+            width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+        .sound-toggle:hover { background: rgba(255,255,255,0.2); }
+        .sound-toggle.muted { opacity: 0.5; text-decoration: line-through; }
+
+        /* --- VISUALIZATION STAGE --- */
+        .stage-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             margin-bottom: 20px;
         }
 
-        .bar-group { margin-bottom: 15px; }
-        .bar-label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; font-weight: bold; }
-        
-        .progress-bg {
-            width: 100%; height: 24px; background: rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden; position: relative;
+        /* SVG Arrows Layer */
+        .svg-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
         }
-        .progress-fill {
-            height: 100%; width: 0%; transition: width 0.1s;
+        path {
+            fill: none;
+            stroke: rgba(255,255,255,0.3);
+            stroke-width: 2;
+            transition: stroke 0.3s, stroke-width 0.2s;
         }
-        /* Markers for Theoretical Stationary Distribution */
-        .marker {
-            position: absolute; top: 0; bottom: 0; width: 4px; background: rgba(255,255,255,0.8);
-            z-index: 10; box-shadow: 0 0 5px black;
+        path.active-path {
+            stroke: var(--accent-color);
+            stroke-width: 4;
+            filter: drop-shadow(0 0 5px var(--accent-color));
         }
 
-        /* Controls */
-        .controls {
-            display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;
-            background: rgba(0,0,0,0.3); padding: 15px 25px; border-radius: 50px;
+        /* State Nodes */
+        .nodes-wrapper {
+            display: flex;
+            justify-content: space-between;
+            width: 300px;
+            z-index: 1;
+        }
+
+        .node {
+            width: 100px; height: 100px;
+            border-radius: 50%;
+            background: var(--card-bg);
+            border: 2px solid rgba(255,255,255,0.2);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
             align-items: center;
+            backdrop-filter: blur(5px);
+            transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+            position: relative;
+        }
+
+        .node.active {
+            transform: scale(1.15);
+            box-shadow: 0 0 30px rgba(255,255,255,0.4);
+            border-color: white;
+            z-index: 2;
+        }
+
+        .node-icon { font-size: 2.5rem; margin-bottom: 5px; }
+        .node-label { font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
+        
+        /* Particle Moving Animation */
+        .particle {
+            position: absolute;
+            width: 20px; height: 20px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px white;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* --- HISTORY TICKER --- */
+        .ticker-container {
+            width: 100%; max-width: 600px;
+            height: 50px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.05);
+            position: relative;
+        }
+        .ticker-container::after {
+            content: ''; position: absolute; top: 0; right: 0; width: 50px; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(0,0,0,0.4));
+        }
+        .ticker-item {
+            font-size: 1.5rem;
+            margin-right: 10px;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* --- STATS & CONTROLS --- */
+        .dashboard {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 20px;
+            width: 100%; max-width: 550px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .stat-row { margin-bottom: 15px; }
+        .stat-header { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; }
+        
+        .progress-track {
+            height: 12px; background: rgba(0,0,0,0.3); border-radius: 6px; overflow: hidden; position: relative;
+        }
+        .progress-bar { height: 100%; transition: width 0.2s linear; }
+        .target-line {
+            position: absolute; top: 0; bottom: 0; width: 2px; background: white;
+            box-shadow: 0 0 4px black; z-index: 5;
+        }
+
+        .action-area {
+            display: flex; gap: 10px; justify-content: center; margin-top: 25px; flex-wrap: wrap;
         }
 
         button {
-            padding: 10px 25px; border-radius: 25px; border: none; font-weight: 700; cursor: pointer;
-            background: #ecf0f1; color: #2c3e50; transition: transform 0.1s;
+            border: none; padding: 12px 24px; border-radius: 30px; font-weight: bold; cursor: pointer;
+            font-size: 0.9rem; transition: transform 0.1s, filter 0.2s;
         }
         button:active { transform: scale(0.95); }
-        button.primary { background: #e67e22; color: white; }
-        button.step { background: #feca57; color: #2c3e50; }
+        .btn-step { background: rgba(255,255,255,0.2); color: white; }
+        .btn-run { background: white; color: #333; }
+        .btn-run.running { background: #ff7675; color: white; }
+        
+        input[type=range] { accent-color: var(--accent-color); }
 
-        /* Select Dropdown */
-        select {
-            padding: 10px 15px; border-radius: 20px; border: none;
-            font-weight: bold; cursor: pointer; background: #ecf0f1; color: #2c3e50;
-        }
-
-        input[type=range] { accent-color: #e67e22; cursor: pointer; width: 100px; }
-
-        /* Modal */
-        .modal-overlay {
+        /* --- MODAL --- */
+        .modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex; align-items: center; justify-content: center;
-            z-index: 1000; opacity: 0; pointer-events: none;
-            transition: opacity 0.3s;
+            background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 100;
         }
-        .modal-overlay.active { opacity: 1; pointer-events: auto; }
-        .modal-card {
-            background: white; padding: 30px; border-radius: 20px;
-            max-width: 500px; width: 90%; color: #2d3436;
+        .modal.open { display: flex; }
+        .modal-content {
+            background: #2c3e50; padding: 30px; border-radius: 20px; max-width: 500px; color: white;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
-        .close-btn { width: 100%; margin-top: 20px; background: #2c3e50; color: white; }
-
     </style>
 </head>
 <body>
 
     <h1>Markov Chain</h1>
-    <p class="subtitle">Exploring Stationarity</p>
+    <p class="subtitle">Visualizing Stochastic Processes</p>
 
-    <div style="margin-bottom: 20px;">
-        <select id="presetSelect" onchange="changePreset()">
+    <div class="controls-top">
+        <select id="presetSelect" onchange="loadPreset()">
             <option value="weather">Scenario: Weather (Balanced)</option>
-            <option value="brand">Scenario: Brand Loyalty (Sticky)</option>
-            <option value="habit">Scenario: Bad Habit (Trap)</option>
+            <option value="brand">Scenario: Sticky Brand (High Loyalty)</option>
+            <option value="habit">Scenario: Bad Habit (Trap State)</option>
+            <option value="gamble">Scenario: Gambler's Ruin</option>
         </select>
-    </div>
-<div style="background: rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 10px; font-size: 0.9rem; text-align: center; max-width: 600px; margin-bottom: 20px; border-left: 4px solid #e67e22;">
-    <strong>🎯 Goal:</strong> Reach the "Stationary Distribution" (The White Line).<br>
-    <span style="opacity: 0.8">Switch scenarios and click <strong>Run Fast</strong>. Watch how the colored bars always fight to align perfectly with the white markers, no matter where they start.<br>This is because they are irreducible, aperiodic and have a finite state space!</span>
-</div>
-    <div class="main-stage">
-        <div class="icon-display" id="mainIcon">☀️</div>
-        
-        <div class="diagram-container">
-            <div class="state-box" id="boxA">
-                <div class="state-name" id="nameA">Sunny</div>
-                <div class="arrow-label" id="loopA">Loop: 70%</div>
-                <div class="arrow-label" id="toB">To B: 30%</div>
-            </div>
-            <div style="font-size: 2rem; opacity: 0.5;">⇄</div>
-            <div class="state-box" id="boxB">
-                <div class="state-name" id="nameB">Rainy</div>
-                <div class="arrow-label" id="loopB">Loop: 60%</div>
-                <div class="arrow-label" id="toA">To A: 40%</div>
-            </div>
+        <div class="sound-toggle" id="soundBtn" onclick="toggleMute()" title="Toggle Sound">
+            🔊
         </div>
     </div>
 
-    <div class="stats-container">
-        <div style="text-align: center; margin-bottom: 15px; opacity: 0.8; font-family: monospace;">
-            Step: <span id="stepEl">0</span>
-        </div>
-        
-        <div class="bar-group">
-            <div class="bar-label"><span id="labelA">Sunny</span> <span id="pctA">0%</span></div>
-            <div class="progress-bg">
-                <div class="progress-fill" id="barA" style="background: #f1c40f;"></div>
-                <div class="marker" id="markA" title="Theoretical Stationary Point"></div>
+    <div class="stage-container">
+        <svg class="svg-layer" viewBox="0 0 600 300">
+            <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,255,255,0.5)" />
+                </marker>
+            </defs>
+            <path id="pathAA" d="M 200,110 C 150,50 250,50 200,110" /> <path id="pathBB" d="M 400,110 C 350,50 450,50 400,110" /> <path id="pathAB" d="M 210,150 Q 300,100 390,150" marker-end="url(#arrowhead)"/> <path id="pathBA" d="M 390,150 Q 300,200 210,150" marker-end="url(#arrowhead)"/> </svg>
+
+        <div class="nodes-wrapper">
+            <div class="node" id="node0">
+                <div class="node-icon" id="icon0">☀️</div>
+                <div class="node-label" id="label0">Sunny</div>
+            </div>
+            <div class="node" id="node1">
+                <div class="node-icon" id="icon1">🌧️</div>
+                <div class="node-label" id="label1">Rainy</div>
             </div>
         </div>
         
-        <div class="bar-group">
-            <div class="bar-label"><span id="labelB">Rainy</span> <span id="pctB">0%</span></div>
-            <div class="progress-bg">
-                <div class="progress-fill" id="barB" style="background: #3498db;"></div>
-                <div class="marker" id="markB" title="Theoretical Stationary Point"></div>
+        <div class="particle" id="particle"></div>
+    </div>
+
+    <div class="ticker-container" id="tickerTape">
+        </div>
+
+    <div class="dashboard">
+        <div style="text-align: center; font-family: monospace; opacity: 0.6; margin-bottom: 15px;">
+            TOTAL STEPS: <span id="stepCount">0</span>
+        </div>
+
+        <div class="stat-row">
+            <div class="stat-header">
+                <span id="statName0">State A</span>
+                <span id="statPct0">0%</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-bar" id="bar0" style="width: 0%; background: var(--state-a-color);"></div>
+                <div class="target-line" id="target0" title="Theoretical Limit"></div>
             </div>
         </div>
-        
-        <div style="text-align: center; font-size: 0.8rem; opacity: 0.6; margin-top: 5px;">
-            White line = Theoretical Limit (Stationarity)
-        </div>
-    </div>
 
-    <div class="controls">
-        <button class="step" onclick="stepManual()">+1 Step</button>
-        <button id="btnStart" class="primary" onclick="toggleSim()">Run Fast</button>
-        
-        <div style="display:flex; flex-direction: column; align-items:center; margin: 0 10px;">
-            <span style="font-size:0.6rem; font-weight:bold; margin-bottom: 2px;">SPEED</span>
-            <input type="range" id="speedRange" min="1" max="100" value="10">
+        <div class="stat-row">
+            <div class="stat-header">
+                <span id="statName1">State B</span>
+                <span id="statPct1">0%</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-bar" id="bar1" style="width: 0%; background: var(--state-b-color);"></div>
+                <div class="target-line" id="target1" title="Theoretical Limit"></div>
+            </div>
         </div>
 
-        <button onclick="resetSim()">Reset</button>
-        <button onclick="toggleModal()">?</button>
-    </div>
-
-    <div class="modal-overlay" id="modal">
-        <div class="modal-card">
-            <h2>Understanding Stationarity</h2>
-            <p>A Markov Chain has a "Stationary Distribution"—a specific percentage it will settle at in the long run.</p>
+        <div class="action-area">
+            <button class="btn-step" onclick="manualStep()">+1 Step</button>
+            <button class="btn-run" id="runBtn" onclick="toggleRun()">Run Fast</button>
             
-            <h3>The Scenarios:</h3>
-            <ul>
-                <li><strong>Weather:</strong> Standard switching. Settles around 57% / 43%.</li>
-                <li><strong>Brand Loyalty:</strong> People stick to their favorite brand (90% retention). Highly skewed stationarity.</li>
-                <li><strong>Bad Habit:</strong> Easy to start (50%), hard to quit (90% stay). Creates a "Trap" state.</li>
-            </ul>
+            <div style="display:flex; flex-direction:column; align-items:center; margin-left: 10px;">
+                <span style="font-size:0.6rem; font-weight:bold;">SPEED</span>
+                <input type="range" id="speedRange" min="1" max="100" value="10">
+            </div>
+            
+            <button class="btn-step" onclick="reset()">Reset</button>
+            <button class="btn-step" onclick="toggleModal()">?</button>
+        </div>
+    </div>
 
-            <p><strong>Look for the white line</strong> on the bars. That is the mathematical prediction. Watch how the colored bars converge to it!</p>
-            <button class="close-btn" onclick="toggleModal()">Got it!</button>
+    <div class="modal" id="infoModal">
+        <div class="modal-content">
+            <h2>Markov Chains & Sounds</h2>
+            <p>This simulation creates a generated "soundscape" based on probability.</p>
+            <ul>
+                <li><strong>High Pitch:</strong> State A (e.g., Sunny)</li>
+                <li><strong>Low Pitch:</strong> State B (e.g., Rainy)</li>
+            </ul>
+            <p><strong>Note:</strong> Sound automatically mutes if you crank the speed up to save your ears!</p>
+            <button class="btn-run" onclick="toggleModal()">Got it</button>
         </div>
     </div>
 
     <script>
-        // DOM Elements
-        const mainIcon = document.getElementById('mainIcon');
-        const boxA = document.getElementById('boxA');
-        const boxB = document.getElementById('boxB');
-        const nameA = document.getElementById('nameA');
-        const nameB = document.getElementById('nameB');
-        const loopA = document.getElementById('loopA');
-        const loopB = document.getElementById('loopB');
-        const toB = document.getElementById('toB');
-        const toA = document.getElementById('toA');
-        
-        const stepEl = document.getElementById('stepEl');
-        const labelA = document.getElementById('labelA');
-        const labelB = document.getElementById('labelB');
-        const pctA = document.getElementById('pctA');
-        const pctB = document.getElementById('pctB');
-        const barA = document.getElementById('barA');
-        const barB = document.getElementById('barB');
-        const markA = document.getElementById('markA');
-        const markB = document.getElementById('markB');
-        
-        const speedRange = document.getElementById('speedRange');
-        const presetSelect = document.getElementById('presetSelect');
+        // --- AUDIO SYSTEM (Web Audio API) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        let isMuted = false;
 
-        // Logic Variables
-        let isRunning = false;
-        let animationFrame;
-        let currentState = 0; // 0 = A, 1 = B
-        
-        let totalSteps = 0;
-        let countA = 0;
-        let countB = 0;
+        function playSound(type) {
+            if (isMuted || audioCtx.state === 'suspended') return;
+            
+            // Auto-mute if speed is too high to prevent glitching
+            const speed = parseInt(document.getElementById('speedRange').value);
+            if (speed > 25) return; 
 
-        // Current Config (Default: Weather)
-        let config = {
-            name: "weather",
-            labels: ["Sunny", "Rainy"],
-            icons: ["☀️", "🌧️"],
-            colors: ["#f1c40f", "#3498db"], // Bar colors
-            bgColors: ["#f1c40f", "#2c3e50"], // Background transition colors
-            // Transition Matrix: 
-            // P[0][0] (A->A), P[0][1] (A->B)
-            // P[1][0] (B->A), P[1][1] (B->B)
-            probs: [
-                [0.7, 0.3], 
-                [0.4, 0.6]  
-            ],
-            stationary: [57.1, 42.9] // Pre-calculated for visuals
-        };
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
 
-        // PRESETS DATABASE
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            // "Type" 0 = State A (High/Happy), "Type" 1 = State B (Low/Sad)
+            if (type === 0) {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
+            } else {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(220, audioCtx.currentTime); // A3
+                osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.1);
+            }
+
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('soundBtn').innerHTML = isMuted ? '🔇' : '🔊';
+            document.getElementById('soundBtn').classList.toggle('muted');
+            if(!isMuted && audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+
+        // --- CONFIG & STATE ---
         const presets = {
             weather: {
+                colors: ["#f1c40f", "#3498db"],
                 labels: ["Sunny", "Rainy"],
                 icons: ["☀️", "🌧️"],
-                colors: ["#f1c40f", "#3498db"],
-                bgColors: ["#f1c40f", "#2c3e50"],
-                probs: [[0.7, 0.3], [0.4, 0.6]],
-                stationary: [57.1, 42.9]
+                matrix: [[0.7, 0.3], [0.4, 0.6]], // [ [A->A, A->B], [B->A, B->B] ]
+                target: [57.1, 42.9]
             },
             brand: {
+                colors: ["#e74c3c", "#8e44ad"],
                 labels: ["Brand A", "Brand B"],
                 icons: ["🅰️", "🅱️"],
-                colors: ["#e74c3c", "#8e44ad"],
-                bgColors: ["#c0392b", "#8e44ad"],
-                // Strong loyalty: 90% chance to stay
-                probs: [[0.9, 0.1], [0.1, 0.9]], 
-                stationary: [50.0, 50.0]
+                matrix: [[0.9, 0.1], [0.1, 0.9]],
+                target: [50.0, 50.0]
             },
             habit: {
+                colors: ["#2ecc71", "#7f8c8d"],
                 labels: ["Healthy", "Habit"],
                 icons: ["🥗", "🚬"],
-                colors: ["#2ecc71", "#7f8c8d"],
-                bgColors: ["#27ae60", "#7f8c8d"],
-                // Easy to start (50% from Healthy->Habit)
-                // Hard to quit (90% stay in Habit)
-                probs: [[0.5, 0.5], [0.1, 0.9]], 
-                stationary: [16.7, 83.3] // Heavy skew to Habit
+                matrix: [[0.5, 0.5], [0.1, 0.9]],
+                target: [16.7, 83.3]
+            },
+            gamble: {
+                colors: ["#27ae60", "#c0392b"],
+                labels: ["Win", "Loss"],
+                icons: ["🤑", "💸"],
+                matrix: [[0.4, 0.6], [0.6, 0.4]],
+                target: [50.0, 50.0]
             }
         };
 
-        function init() {
-            changePreset();
-        }
+        let currentPreset = presets.weather;
+        let currentState = 0;
+        let counts = [0, 0];
+        let total = 0;
+        let isRunning = false;
+        let animationFrame;
 
-        function changePreset() {
-            const key = presetSelect.value;
-            config = presets[key];
-            
-            // Update Text Labels
-            nameA.innerText = config.labels[0];
-            nameB.innerText = config.labels[1];
-            labelA.innerText = config.labels[0];
-            labelB.innerText = config.labels[1];
-            
-            // Update Prob Labels
-            loopA.innerText = `Loop: ${(config.probs[0][0]*100).toFixed(0)}%`;
-            toB.innerText = `To B: ${(config.probs[0][1]*100).toFixed(0)}%`;
-            loopB.innerText = `Loop: ${(config.probs[1][1]*100).toFixed(0)}%`;
-            toA.innerText = `To A: ${(config.probs[1][0]*100).toFixed(0)}%`;
+        // --- DOM ELEMENTS ---
+        const nodes = [document.getElementById('node0'), document.getElementById('node1')];
+        const icons = [document.getElementById('icon0'), document.getElementById('icon1')];
+        const labels = [document.getElementById('label0'), document.getElementById('label1')];
+        const bars = [document.getElementById('bar0'), document.getElementById('bar1')];
+        const targets = [document.getElementById('target0'), document.getElementById('target1')];
+        const statPcts = [document.getElementById('statPct0'), document.getElementById('statPct1')];
+        const statNames = [document.getElementById('statName0'), document.getElementById('statName1')];
+        const particle = document.getElementById('particle');
+        const ticker = document.getElementById('tickerTape');
+        const paths = {
+            '00': document.getElementById('pathAA'),
+            '01': document.getElementById('pathAB'),
+            '10': document.getElementById('pathBA'),
+            '11': document.getElementById('pathBB')
+        };
 
-            // Update Bar Colors
-            barA.style.background = config.colors[0];
-            barB.style.background = config.colors[1];
+        // --- CORE LOGIC ---
+        function loadPreset() {
+            const key = document.getElementById('presetSelect').value;
+            currentPreset = presets[key];
 
-            // Set Theoretical Markers
-            markA.style.left = config.stationary[0] + "%";
-            markB.style.left = config.stationary[1] + "%";
+            // Update Colors CSS Variables
+            document.documentElement.style.setProperty('--state-a-color', currentPreset.colors[0]);
+            document.documentElement.style.setProperty('--state-b-color', currentPreset.colors[1]);
+            document.documentElement.style.setProperty('--accent-color', currentPreset.colors[0]);
 
-            resetSim();
-        }
-
-        function updateUI() {
-            // Icon & Background
-            mainIcon.innerText = config.icons[currentState];
-            document.body.style.backgroundColor = config.bgColors[currentState];
-            
-            // Diagram Highlight
-            if (currentState === 0) {
-                boxA.classList.add('active');
-                boxB.classList.remove('active');
-            } else {
-                boxA.classList.remove('active');
-                boxB.classList.add('active');
+            // Update UI Text
+            for(let i=0; i<2; i++) {
+                icons[i].innerText = currentPreset.icons[i];
+                labels[i].innerText = currentPreset.labels[i];
+                statNames[i].innerText = currentPreset.labels[i];
+                targets[i].style.left = currentPreset.target[i] + "%";
             }
 
-            // Stats
-            stepEl.innerText = totalSteps.toLocaleString();
-            
-            if (totalSteps > 0) {
-                const pA = (countA / totalSteps * 100).toFixed(1);
-                const pB = (countB / totalSteps * 100).toFixed(1);
-                
-                pctA.innerText = pA + "%";
-                barA.style.width = pA + "%";
-                
-                pctB.innerText = pB + "%";
-                barB.style.width = pB + "%";
-            } else {
-                barA.style.width = "0%";
-                barB.style.width = "0%";
-            }
+            reset();
         }
 
-        function stepLogic() {
-            const r = Math.random();
-            const currentProbs = config.probs[currentState]; // [Stay, Switch]
-            
-            // In my config matrix:
-            // if currentState is 0 (A): [P(A->A), P(A->B)]
-            // if currentState is 1 (B): [P(B->A), P(B->B)] <-- WAIT!
-            // Standard matrix is P_ij. 
-            // Row 0: A->A, A->B. 
-            // Row 1: B->A, B->B.
-            
-            if (currentState === 0) {
-                // We are at A.
-                // Stay at A if r < P(A->A)
-                if (r < currentProbs[0]) {
-                    currentState = 0;
-                } else {
-                    currentState = 1;
-                }
-            } else {
-                // We are at B.
-                // Go to A if r < P(B->A) (Index 0 of row 1)
-                if (r < currentProbs[0]) {
-                    currentState = 0;
-                } else {
-                    currentState = 1;
-                }
-            }
-
-            totalSteps++;
-            if (currentState === 0) countA++;
-            else countB++;
-        }
-
-        function stepManual() {
-            if (isRunning) toggleSim(); // Pause if running
-            stepLogic();
-            updateUI();
-        }
-
-        function resetSim() {
+        function reset() {
             isRunning = false;
             cancelAnimationFrame(animationFrame);
-            document.getElementById('btnStart').innerText = "Run Fast";
+            document.getElementById('runBtn').classList.remove('running');
+            document.getElementById('runBtn').innerText = "Run Fast";
             
-            currentState = 0; // Start at A
-            totalSteps = 0;
-            countA = 0;
-            countB = 0;
+            currentState = 0;
+            counts = [0, 0];
+            total = 0;
+            ticker.innerHTML = '';
             
-            updateUI();
+            updateVisuals(true);
         }
 
-        function toggleSim() {
-            if (isRunning) {
-                isRunning = false;
-                document.getElementById('btnStart').innerText = "Run Fast";
+        function step() {
+            // 1. Determine Next State
+            const probs = currentPreset.matrix[currentState]; // [Stay, Switch] probability
+            // probs[0] is P(stay), probs[1] is P(switch) if we assume matrix is standard
+            // My matrix: [ [P(0->0), P(0->1)], [P(1->0), P(1->1)] ]
+            // Actually let's use the row directly.
+            
+            const r = Math.random();
+            let nextState;
+            
+            if (currentState === 0) {
+                // Row 0: [P(0->0), P(0->1)]
+                nextState = (r < currentPreset.matrix[0][0]) ? 0 : 1;
             } else {
-                isRunning = true;
-                document.getElementById('btnStart').innerText = "Pause";
-                loop();
+                // Row 1: [P(1->0), P(1->1)] -- Note: index 0 is switching to 0
+                nextState = (r < currentPreset.matrix[1][0]) ? 0 : 1;
             }
+
+            // 2. Play Sound
+            playSound(nextState);
+
+            // 3. Highlight Path (only if slow enough to see)
+            const speed = parseInt(document.getElementById('speedRange').value);
+            if (speed < 50) {
+                highlightPath(currentState, nextState);
+            }
+
+            // 4. Update State
+            currentState = nextState;
+            counts[currentState]++;
+            total++;
+
+            // 5. Update UI
+            updateVisuals();
+        }
+
+        function highlightPath(from, to) {
+            // Reset all paths
+            document.querySelectorAll('path').forEach(p => p.classList.remove('active-path'));
+            
+            // Activate specific path
+            const pathKey = "" + from + to;
+            const path = paths[pathKey];
+            if(path) {
+                path.classList.add('active-path');
+                setTimeout(() => path.classList.remove('active-path'), 200);
+            }
+        }
+
+        function updateVisuals(isReset = false) {
+            // Nodes active state
+            nodes.forEach((n, i) => {
+                if(i === currentState) n.classList.add('active');
+                else n.classList.remove('active');
+            });
+
+            // Update Stats
+            document.getElementById('stepCount').innerText = total.toLocaleString();
+            
+            if (total > 0) {
+                const p0 = (counts[0] / total * 100).toFixed(1);
+                const p1 = (counts[1] / total * 100).toFixed(1);
+                
+                bars[0].style.width = p0 + "%";
+                statPct0.innerText = p0 + "%";
+                
+                bars[1].style.width = p1 + "%";
+                statPct1.innerText = p1 + "%";
+            } else {
+                bars[0].style.width = "0%";
+                bars[1].style.width = "0%";
+                statPct0.innerText = "0%";
+                statPct1.innerText = "0%";
+            }
+
+            // Update Ticker Tape (Only add if speed is manageable)
+            const speed = parseInt(document.getElementById('speedRange').value);
+            if (!isReset && speed < 80) {
+                const span = document.createElement('span');
+                span.className = 'ticker-item';
+                span.innerText = currentPreset.icons[currentState];
+                ticker.prepend(span);
+                if (ticker.children.length > 20) ticker.lastChild.remove();
+            }
+        }
+
+        // --- ANIMATION LOOP ---
+        function toggleRun() {
+            isRunning = !isRunning;
+            const btn = document.getElementById('runBtn');
+            if (isRunning) {
+                btn.innerText = "Pause";
+                btn.classList.add('running');
+                if(audioCtx.state === 'suspended') audioCtx.resume();
+                loop();
+            } else {
+                btn.innerText = "Run Fast";
+                btn.classList.remove('running');
+                cancelAnimationFrame(animationFrame);
+            }
+        }
+
+        function manualStep() {
+            if(isRunning) toggleRun(); // Stop auto if manual clicked
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            step();
         }
 
         function loop() {
             if (!isRunning) return;
 
-            const speed = parseInt(speedRange.value);
-            // Turbo Mode Logic
-            // If speed is high (>50), we do multiple steps per frame
-            let loops = 1;
-            if (speed > 50) loops = Math.pow(speed - 40, 1.5); 
+            const speed = parseInt(document.getElementById('speedRange').value);
             
-            // Slow Mode Logic
-            // If speed is low, we throttle frames (handled simply by loops=1 but fast update)
-            // Ideally we'd use time-delta for slow, but for this "Run Fast" focus, we just blast it.
+            // If speed is super high, do multiple calcs per frame
+            let stepsPerFrame = 1;
+            if (speed > 50) stepsPerFrame = Math.floor(Math.pow(speed - 40, 1.6));
 
-            for (let i = 0; i < loops; i++) {
-                stepLogic();
+            for (let i = 0; i < stepsPerFrame; i++) {
+                step();
             }
-            
-            updateUI();
-            
-            // Throttle visual updates if super fast to save CPU? 
-            // No need, browser handles it well enough for simple DOM.
-            
-            // Delay for very slow speeds
-            if (speed < 20) {
-                 setTimeout(() => {
-                     if(isRunning) animationFrame = requestAnimationFrame(loop);
-                 }, (20 - speed) * 20);
+
+            // Throttle visual updates if running very fast
+            let delay = 0;
+            if (speed < 30) delay = (30 - speed) * 20;
+
+            if (delay > 0) {
+                setTimeout(() => {
+                    animationFrame = requestAnimationFrame(loop);
+                }, delay);
             } else {
                 animationFrame = requestAnimationFrame(loop);
             }
         }
 
-        function toggleModal() { document.getElementById('modal').classList.toggle('active'); }
-        document.getElementById('modal').addEventListener('click', function(e) {
-            if (e.target === this) toggleModal();
-        });
+        function toggleModal() {
+            const m = document.getElementById('infoModal');
+            m.classList.toggle('open');
+        }
 
         // Init
-        init();
+        loadPreset();
 
     </script>
 </body>
-
 </html>
