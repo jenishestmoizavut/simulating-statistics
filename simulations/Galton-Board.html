@@ -13,20 +13,27 @@
             --secondary: #576574;
             --text-color: #c8d6e5;
             --container-bg: #151b23;
+            color-scheme: dark; 
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
             min-height: 100vh;
-            overflow-y: auto; /* ALLOW SCROLLING */
+            overflow-y: auto;
         }
+
+        /* --- CUSTOM SCROLLBAR --- */
+        ::-webkit-scrollbar { width: 12px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { 
+            background-color: var(--secondary); 
+            border-radius: 6px; border: 3px solid var(--bg-color); 
+        }
+        ::-webkit-scrollbar-thumb:hover { background-color: var(--accent); }
 
         h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
         p.subtitle { color: #8395a7; margin-top: 0; margin-bottom: 25px; font-size: 1.2rem; }
@@ -35,26 +42,17 @@
             background: rgba(0, 0, 0, 0.2);
             padding: 10px 20px;
             border-radius: 50px;
-            display: flex;
-            gap: 15px;
-            margin-bottom: 25px;
-            z-index: 10;
-            flex-wrap: wrap;
-            justify-content: center;
+            display: flex; gap: 15px; margin-bottom: 25px;
+            z-index: 10; flex-wrap: wrap; justify-content: center;
         }
 
         button {
             background-color: var(--accent);
-            color: #222f3e;
-            border: none;
-            padding: 10px 24px;
-            border-radius: 25px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            font-weight: 700;
+            color: #222f3e; border: none; padding: 10px 24px;
+            border-radius: 25px; font-size: 0.9rem;
+            cursor: pointer; font-weight: 700;
             transition: transform 0.1s, opacity 0.2s;
         }
-        
         button:active { transform: scale(0.95); }
         button.flood { background-color: #feca57; }
         button.flood.active { background-color: var(--danger); color: white; }
@@ -63,51 +61,12 @@
         button.mute.active { background-color: #576574; color: white; }
 
         .canvas-container {
-            border: 2px solid #576574;
-            border-radius: 12px;
+            border: 2px solid #576574; border-radius: 12px;
             background-color: var(--container-bg);
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            padding: 0;
-            line-height: 0; 
-            position: relative;
-            margin-bottom: 50px; /* Space for scrolling */
+            padding: 0; line-height: 0; position: relative; margin-bottom: 50px;
         }
-
-        canvas {
-            display: block;
-            border-radius: 10px;
-        }
-        /* --- CUSTOM SCROLLBAR --- */
-
-/* 1. Tell browser this is a dark page (Quick Fix for defaults) */
-:root {
-    color-scheme: dark; 
-}
-
-/* 2. Custom Styling (Chrome, Edge, Safari) */
-::-webkit-scrollbar {
-    width: 12px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--bg-color); /* Matches your dark blue background */
-}
-
-::-webkit-scrollbar-thumb {
-    background-color: var(--secondary); /* Uses your grey-blue variable */
-    border-radius: 6px;
-    border: 3px solid var(--bg-color); /* Creates a nice padding effect */
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background-color: var(--accent); /* Turns cyan when you grab it */
-}
-
-/* 3. Custom Styling (Firefox) */
-html {
-    scrollbar-width: thin;
-    scrollbar-color: var(--secondary) var(--bg-color);
-}
+        canvas { display: block; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -139,125 +98,80 @@ html {
         const randomness = 0.4;     
         const damping = 0.5;        
 
-        // Layout Variables
-        let width, height;
-        let spacing, pegSize, ballSize;
-        let pegAreaHeight, binAreaHeight, hopperHeight;
-
-        // State
-        let pegs = [];
-        let balls = [];
-        let bins = []; 
-        let floodInterval = null;
-        let maxStackHeight = 0; 
-        
-        // Sound State
-        let audioCtx = null;
-        let isMuted = false;
-        let lastResizeWidth = window.innerWidth;
+        let width, height, spacing, pegSize, ballSize, pegAreaHeight, binAreaHeight, hopperHeight;
+        let pegs = [], balls = [], bins = [], floodInterval = null, maxStackHeight = 0; 
+        let audioCtx = null, isMuted = false, lastResizeWidth = window.innerWidth;
 
         function init() {
             const maxWidth = 550; 
             width = Math.min(window.innerWidth - 30, maxWidth);
-            
-            // Spacing
             spacing = width / (rows + 4); 
             pegSize = spacing * 0.12; 
             ballSize = spacing * 0.22; 
 
-            // Sections
             hopperHeight = spacing * 3; 
             const triangleHeight = rows * spacing;
             binAreaHeight = (ballSize * 2) * 15; 
             pegAreaHeight = hopperHeight + triangleHeight;
             height = pegAreaHeight + binAreaHeight;
-            
-            // Adjust for small screens but ensure min height
-            if (height > window.innerHeight - 200) {
-                // Only reduce if significantly too large, but allow scrolling now
-                // binAreaHeight = Math.max(binAreaHeight, 200); 
-            }
 
             canvas.width = width;
             canvas.height = height;
 
             createPegs();
-            createBins();
+            if (bins.length === 0) createBins();
             
-            if (!window.animationRunning) {
-                window.animationRunning = true;
-                loop();
-            }
+            // This loop handles DRAWING (slows down in BG)
+            requestAnimationFrame(renderLoop);
+            
+            // This loop handles MATH (stays consistent in BG)
+            setInterval(update, 1000 / 60); 
         }
 
-        // --- AUDIO SYSTEM ---
         function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
         }
 
         function playSound(type) {
-            if (isMuted || !audioCtx) return;
-
+            if (isMuted || !audioCtx || document.hidden) return; // Don't play sounds if tab is hidden
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain);
             gain.connect(audioCtx.destination);
-
             const now = audioCtx.currentTime;
 
             if (type === 'hit') {
-                // High pitch click
                 osc.type = 'sine';
-                // Randomize pitch slightly for realism
-                const freq = 800 + Math.random() * 200; 
-                osc.frequency.setValueAtTime(freq, now);
+                osc.frequency.setValueAtTime(800 + Math.random() * 200, now);
                 osc.frequency.exponentialRampToValueAtTime(100, now + 0.05);
-                
-                gain.gain.setValueAtTime(0.05, now); // Very quiet
+                gain.gain.setValueAtTime(0.03, now);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-                
-                osc.start(now);
-                osc.stop(now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
             } else if (type === 'land') {
-                // Low thud
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(150, now);
                 osc.frequency.exponentialRampToValueAtTime(50, now + 0.1);
-                
-                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.setValueAtTime(0.05, now);
                 gain.gain.linearRampToValueAtTime(0, now + 0.1);
-                
-                osc.start(now);
-                osc.stop(now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
             }
         }
 
         function toggleMute() {
             isMuted = !isMuted;
-            const btn = document.getElementById('muteBtn');
-            btn.innerText = isMuted ? '🔇' : '🔊';
-            btn.classList.toggle('active');
+            document.getElementById('muteBtn').innerText = isMuted ? '🔇' : '🔊';
         }
 
         function createPegs() {
             pegs = [];
             const startY = hopperHeight + (spacing * 0.5); 
-
             for (let row = 0; row < rows; row++) {
                 const cols = row + 3; 
                 const rowWidth = (cols - 1) * spacing;
                 const startX = (width - rowWidth) / 2;
-
                 for (let col = 0; col < cols; col++) {
-                    pegs.push({
-                        x: startX + col * spacing,
-                        y: startY + row * spacing
-                    });
+                    pegs.push({ x: startX + col * spacing, y: startY + row * spacing });
                 }
             }
         }
@@ -269,14 +183,11 @@ html {
         }
 
         function spawnBall() {
-            initAudio(); // Try to start audio on user interaction
-            
+            initAudio();
             const randomOffset = (Math.random() - 0.5) * 5; 
             balls.push({
-                x: width / 2 + randomOffset,
-                y: 10,
-                vx: (Math.random() - 0.5) * 1, 
-                vy: 0,
+                x: width / 2 + randomOffset, y: 10,
+                vx: (Math.random() - 0.5) * 1, vy: 0,
                 color: `hsl(${Math.random() * 40 + 190}, 90%, 65%)`, 
                 active: true
             });
@@ -291,80 +202,47 @@ html {
                 btn.innerText = "🌊 Flood Gates";
                 btn.classList.remove('active');
             } else {
-                spawnBall(); // Immediate spawn
-                floodInterval = setInterval(spawnBall, 30); 
+                floodInterval = setInterval(spawnBall, 40); 
                 btn.innerText = "🛑 Stop";
                 btn.classList.add('active');
             }
         }
 
         function resetBoard() {
-            balls = [];
-            bins.fill(0);
-            maxStackHeight = 0;
+            balls = []; bins.fill(0); maxStackHeight = 0;
             if (floodInterval) toggleFlood();
-            ctx.clearRect(0,0,width,height);
         }
 
         function update() {
             for (let i = balls.length - 1; i >= 0; i--) {
                 let b = balls[i];
-                if (!b.active) continue;
-                
-                b.vy += gravity;
-                b.vx *= friction;
-                b.x += b.vx;
-                b.y += b.vy;
+                b.vy += gravity; b.vx *= friction;
+                b.x += b.vx; b.y += b.vy;
 
-                // Hopper Logic
                 if (b.y < hopperHeight) {
-                    const funnelSlope = 1.5; 
-                    const centerX = width / 2;
+                    const funnelSlope = 1.5; const centerX = width / 2;
                     const funnelWidthAtY = 15 + (b.y * funnelSlope);
-                    
-                    if (b.x < centerX - funnelWidthAtY) {
-                        b.x = centerX - funnelWidthAtY;
-                        b.vx = Math.abs(b.vx) * 0.5 + 0.8; 
-                    } else if (b.x > centerX + funnelWidthAtY) {
-                        b.x = centerX + funnelWidthAtY;
-                        b.vx = -Math.abs(b.vx) * 0.5 - 0.8; 
-                    }
-                } else {
-                    if (b.x < ballSize) { b.x = ballSize; b.vx *= -0.5; }
-                    else if (b.x > width - ballSize) { b.x = width - ballSize; b.vx *= -0.5; }
+                    if (b.x < centerX - funnelWidthAtY) { b.x = centerX - funnelWidthAtY; b.vx = Math.abs(b.vx) * 0.5 + 0.8; } 
+                    else if (b.x > centerX + funnelWidthAtY) { b.x = centerX + funnelWidthAtY; b.vx = -Math.abs(b.vx) * 0.5 - 0.8; }
                 }
 
-                // Peg Collision
                 for (let peg of pegs) {
-                    const dx = b.x - peg.x;
-                    const dy = b.y - peg.y;
+                    const dx = b.x - peg.x; const dy = b.y - peg.y;
                     const dist = Math.sqrt(dx*dx + dy*dy);
-
                     if (dist < pegSize + ballSize) {
                         const angle = Math.atan2(dy, dx);
                         const overlap = (pegSize + ballSize) - dist;
-                        b.x += Math.cos(angle) * overlap;
-                        b.y += Math.sin(angle) * overlap;
-
+                        b.x += Math.cos(angle) * overlap; b.y += Math.sin(angle) * overlap;
                         b.vx *= damping; 
-                        let bounceDir = Math.sign(dx);
-                        if (Math.abs(dx) < 0.2) bounceDir = Math.random() > 0.5 ? 1 : -1;
-                        const noise = (Math.random() - 0.5) * randomness;
-                        b.vx += (bounceDir * kickStrength) + noise; 
+                        let bounceDir = Math.sign(dx) || (Math.random() > 0.5 ? 1 : -1);
+                        b.vx += (bounceDir * kickStrength) + (Math.random() - 0.5) * randomness; 
                         b.vy *= -elasticity;
-
-                        // Play Sound
-                        // Limit sound frequency to avoid chaos
-                        if (Math.random() > 0.5) playSound('hit');
+                        if (Math.random() > 0.6) playSound('hit');
                     }
                 }
 
-                // Bin Logic
                 if (b.y > pegAreaHeight) {
-                    const center = width / 2;
-                    const relativeX = b.x - center;
-                    const binIndex = Math.round(relativeX / spacing) + Math.floor(bins.length / 2);
-                    
+                    const binIndex = Math.round((b.x - width/2) / spacing) + Math.floor(bins.length / 2);
                     if (binIndex >= 0 && binIndex < bins.length) {
                         bins[binIndex]++;
                         if (bins[binIndex] > maxStackHeight) maxStackHeight = bins[binIndex];
@@ -375,132 +253,64 @@ html {
             }
         }
 
-        function draw() {
+        function renderLoop() {
             ctx.clearRect(0, 0, width, height);
 
-            // 1. Draw Funnel
+            // 1. Funnel
             ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
             ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(width, 0);
-            ctx.lineTo(width, hopperHeight);
-            ctx.lineTo(width/2 + 20, hopperHeight); 
-            ctx.lineTo(width, 0); 
-            ctx.moveTo(0, 0);
-            ctx.lineTo(width/2 - 20, hopperHeight); 
-            ctx.lineTo(0, hopperHeight);
+            ctx.moveTo(0,0); ctx.lineTo(width,0); ctx.lineTo(width,hopperHeight);
+            ctx.lineTo(width/2+20, hopperHeight); ctx.lineTo(width/2-20, hopperHeight); ctx.lineTo(0,hopperHeight);
             ctx.fill();
 
-            // 2. Draw Pegs
+            // 2. Pegs
             ctx.fillStyle = '#8395a7';
-            for (let p of pegs) {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, pegSize, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            for (let p of pegs) { ctx.beginPath(); ctx.arc(p.x, p.y, pegSize, 0, Math.PI*2); ctx.fill(); }
 
-            // 3. Draw Bin Guides
-            ctx.strokeStyle = '#2f3640'; 
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            const center = width / 2;
+            // 3. Guides
+            ctx.strokeStyle = '#2f3640'; ctx.lineWidth = 1;
             for (let i = 0; i <= bins.length; i++) {
-                const xPos = center + (i - Math.floor(bins.length / 2) - 0.5) * spacing;
-                ctx.moveTo(xPos, pegAreaHeight);
-                ctx.lineTo(xPos, height);
+                const x = width/2 + (i - Math.floor(bins.length/2) - 0.5) * spacing;
+                ctx.beginPath(); ctx.moveTo(x, pegAreaHeight); ctx.lineTo(x, height); ctx.stroke();
             }
-            ctx.stroke();
 
-            // 4. Draw Stacks (Scalable)
-            let ySpacing = ballSize * 2; 
-            const maxAllowedPixels = height - pegAreaHeight - 5;
-            const currentTallestPixels = maxStackHeight * ySpacing;
-            
-            if (currentTallestPixels > maxAllowedPixels) {
-                ySpacing = maxAllowedPixels / maxStackHeight;
-            }
+            // 4. Stacks
+            let ySpc = ballSize * 2;
+            const maxH = height - pegAreaHeight - 5;
+            if (maxStackHeight * ySpc > maxH) ySpc = maxH / maxStackHeight;
 
             for (let i = 0; i < bins.length; i++) {
-                const count = bins[i];
-                if (count === 0) continue;
-                const xPos = center + (i - Math.floor(bins.length / 2)) * spacing;
-                
-                for (let j = 0; j < count; j++) {
-                    const yPos = height - ballSize - (j * ySpacing) - 2; 
-                    
-                    const hue = 190 + (j * 2); 
-                    ctx.fillStyle = `hsl(${hue}, 80%, 60%)`;
-                    
-                    ctx.beginPath();
-                    ctx.ellipse(xPos, yPos, ballSize, ballSize * (ySpacing/(ballSize*2)), 0, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    // Shine
-                    if (ySpacing > 2) {
-                        ctx.fillStyle = 'rgba(255,255,255,0.2)';
-                        ctx.beginPath();
-                        ctx.ellipse(xPos - ballSize*0.3, yPos - ballSize*0.3, ballSize/3, ballSize/3, 0, 0, Math.PI*2);
-                        ctx.fill();
-                    }
+                const x = width/2 + (i - Math.floor(bins.length/2)) * spacing;
+                for (let j = 0; j < bins[i]; j++) {
+                    const y = height - ballSize - (j * ySpc) - 2;
+                    ctx.fillStyle = `hsl(${190 + (j*2)}, 80%, 60%)`;
+                    ctx.beginPath(); ctx.ellipse(x, y, ballSize, ballSize * (ySpc/(ballSize*2)), 0, 0, Math.PI*2); ctx.fill();
                 }
             }
 
-            // 5. Draw Active Balls
-            for (let b of balls) {
-                ctx.fillStyle = b.color;
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, ballSize, 0, Math.PI * 2);
-                ctx.fill();
+            // 5. Active Balls
+            for (let b of balls) { ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x, b.y, ballSize, 0, Math.PI*2); ctx.fill(); }
+
+            // 6. Y-Axis
+            const cap = Math.floor(maxH / ySpc);
+            let step = cap > 100 ? 50 : (cap > 50 ? 25 : (cap > 25 ? 10 : 5));
+            ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.font = "10px monospace";
+            for (let c = step; c <= cap; c += step) {
+                const y = height - (c * ySpc);
+                ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+                ctx.fillText(c, 5, y - 2);
             }
 
-            // 6. Dynamic Y-Axis
-            const visibleCapacity = Math.floor(maxAllowedPixels / ySpacing);
-            let step = 5;
-            if (visibleCapacity > 25) step = 10;
-            if (visibleCapacity > 50) step = 25;
-            if (visibleCapacity > 100) step = 50;
-
-            ctx.textAlign = "left";
-            ctx.textBaseline = "bottom";
-            ctx.font = "bold 11px monospace";
-            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-
-            for (let c = step; c <= visibleCapacity; c += step) {
-                const yPos = height - (c * ySpacing);
-                ctx.beginPath();
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.1)"; 
-                ctx.moveTo(0, yPos);
-                ctx.lineTo(width, yPos);
-                ctx.stroke();
-                ctx.fillText(c, 5, yPos - 2);
-            }
-        }
-
-        function loop() {
-            update();
-            draw();
-            requestAnimationFrame(loop);
+            requestAnimationFrame(renderLoop);
         }
 
         init();
-        
-        // --- SMARTER RESIZE ---
-        // Only resets if width changes significantly (e.g. rotation or large resize)
-        // Ignores small height changes (like mobile browser bars appearing)
-        let resizeTimeout;
         window.addEventListener('resize', () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                const newWidth = window.innerWidth;
-                // Only reset if width changed by more than 50px
-                if (Math.abs(newWidth - lastResizeWidth) > 50) {
-                    lastResizeWidth = newWidth;
-                    resetBoard();
-                    init();
-                }
-            }, 100);
+            if (Math.abs(window.innerWidth - lastResizeWidth) > 50) {
+                lastResizeWidth = window.innerWidth;
+                init();
+            }
         });
-
     </script>
 </body>
 </html>
