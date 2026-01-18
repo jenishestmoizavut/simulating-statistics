@@ -9,11 +9,10 @@
         :root {
             --bg-color: #222f3e;
             --water: #34ace0;
-            --land: #27ae60;
-            --bridge: #d35400;
+            --bridge-valid: #f1c40f; 
+            --bridge-dull: #d35400;  
             --bridge-crossed: #7f8c8d;
             --text-color: #ecf0f1;
-            --accent: #f1c40f;
         }
 
         body {
@@ -26,14 +25,25 @@
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
+            user-select: none; /* Prevent highlighting text while playing */
         }
 
         h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; }
-        p.subtitle { color: #bdc3c7; margin-top: 0; margin-bottom: 25px; }
-
-        .controls {
-            display: flex; gap: 15px; margin-bottom: 20px;
+        
+        .status-bar {
+            background: rgba(0,0,0,0.3);
+            padding: 8px 20px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            color: #48dbfb;
+            font-size: 1.1rem;
+            min-height: 24px;
+            transition: color 0.2s;
         }
+        .status-bar.error { color: #ff6b6b; animation: shake 0.3s; }
+
+        .controls { display: flex; gap: 15px; margin-bottom: 20px; }
 
         button {
             padding: 10px 24px; border-radius: 25px; border: none;
@@ -41,7 +51,7 @@
             background: #576574; color: white; transition: transform 0.1s;
         }
         button:active { transform: scale(0.95); }
-        button.primary { background-color: var(--accent); color: #2c3e50; }
+        button.primary { background-color: #f1c40f; color: #2c3e50; }
 
         .game-container {
             position: relative;
@@ -51,23 +61,25 @@
             border: 2px solid #576574;
         }
 
-        canvas { display: block; cursor: pointer; }
+        canvas { display: block; }
 
-        /* Messages */
+        /* Overlay Messages */
         .message-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             opacity: 0; pointer-events: none; transition: opacity 0.3s;
+            text-align: center; padding: 20px;
         }
         .message-overlay.active { opacity: 1; pointer-events: auto; }
-        .message-text { font-size: 2rem; font-weight: bold; margin-bottom: 20px; color: #e74c3c; }
+        .message-text { font-size: 2.5rem; font-weight: bold; margin-bottom: 10px; color: #ff6b6b; }
+        .message-sub { color: #bdc3c7; margin-bottom: 25px; font-size: 1.1rem; max-width: 400px; line-height: 1.5; }
 
         /* Modal */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.8);
             display: flex; align-items: center; justify-content: center;
             z-index: 1000; opacity: 0; pointer-events: none;
             transition: opacity 0.3s; backdrop-filter: blur(5px);
@@ -75,33 +87,42 @@
         .modal-overlay.active { opacity: 1; pointer-events: auto; }
         .modal-card {
             background: white; padding: 30px; border-radius: 20px;
-            max-width: 600px; width: 90%; color: #2d3436;
+            max-width: 650px; width: 90%; color: #2d3436;
             box-shadow: 0 20px 50px rgba(0,0,0,0.5);
             transform: translateY(20px); transition: transform 0.3s;
+            max-height: 85vh; overflow-y: auto;
         }
         .modal-overlay.active .modal-card { transform: translateY(0); }
-        .modal-card h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
-        .modal-card p { line-height: 1.6; }
-        .highlight { color: #e74c3c; font-weight: bold; }
-        .close-btn { margin-top: 20px; width: 100%; background: #2c3e50; color: white; }
+        .modal-card h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; }
+        .modal-card h3 { color: #2980b9; margin-top: 25px; margin-bottom: 10px; }
+        .modal-card p, .modal-card li { line-height: 1.7; font-size: 1rem; color: #576574; }
+        .highlight-box { background: #f1f2f6; border-left: 4px solid #e74c3c; padding: 15px; margin: 15px 0; border-radius: 4px; }
+        .close-btn { margin-top: 25px; width: 100%; background: #2c3e50; color: white; padding: 12px; cursor: pointer; }
 
         .stats { margin-top: 10px; font-family: monospace; color: #bdc3c7; }
+        
+        @keyframes shake {
+            0% { transform: translateX(0); } 25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); } 75% { transform: translateX(-5px); } 100% { transform: translateX(0); }
+        }
     </style>
 </head>
 <body>
 
     <h1>The Seven Bridges</h1>
-    <p class="subtitle">Can you cross every bridge exactly once?</p>
+    
+    <div class="status-bar" id="statusBar">Start: Tap a glowing bridge to move</div>
 
     <div class="controls">
         <button class="primary" onclick="resetGame()">Reset Map</button>
-        <button onclick="toggleModal()">?</button>
+        <button onclick="toggleModal()">Give Up / Explain 💡</button>
     </div>
 
     <div class="game-container">
         <canvas id="gameCanvas"></canvas>
         <div class="message-overlay" id="msgOverlay">
-            <div class="message-text">STUCK! 🚫</div>
+            <div class="message-text">TRAPPED! 🚫</div>
+            <div class="message-sub">You are stuck in <span id="stuckLoc"></span>. Every path out has already been used.</div>
             <button class="primary" onclick="resetGame()">Try Again</button>
         </div>
     </div>
@@ -112,21 +133,27 @@
 
     <div class="modal-overlay" id="modal">
         <div class="modal-card">
-            <h2>Why is this impossible?</h2>
-            <p>Don't worry, you didn't fail. The game is rigged.</p>
-            <p>In 1736, mathematician <strong>Leonhard Euler</strong> proved that this path doesn't exist. This problem actually invented Graph Theory!</p>
+            <h2>The Impossible Puzzle (1736)</h2>
+            <p>You probably got stuck, right? <strong>That's because it's impossible.</strong></p>
+            <p>In 1736, mathematician <strong>Leonhard Euler</strong> proved there is no solution to this map. This realization invented <em>Graph Theory</em>.</p>
             
-            <h3>The Logic (Euler's Path):</h3>
-            <p>To cross every bridge exactly once, a landmass must have an <strong>Even</strong> number of bridges connected to it (enter one, leave one).</p>
-            <p>However, look at the map:</p>
+            <h3>The Logic: "Enter and Leave"</h3>
+            <p>Think of each landmass as a room. If you enter a room by one bridge, you must leave by another. This means bridges must come in pairs.</p>
+            
+            <div class="highlight-box">
+                <strong>Euler's Rule:</strong> To cross every bridge exactly once, every landmass must have an <strong>EVEN</strong> number of bridges attached to it.<br><br>
+                (The Start and End points are the only allowed exceptions).
+            </div>
+
+            <h3>Why You Failed (It's not your fault)</h3>
             <ul>
-                <li>Top Bank: <span class="highlight">3 Bridges</span> (Odd)</li>
-                <li>Bottom Bank: <span class="highlight">3 Bridges</span> (Odd)</li>
-                <li>Middle Island: <span class="highlight">5 Bridges</span> (Odd)</li>
-                <li>Right Bank: <span class="highlight">3 Bridges</span> (Odd)</li>
+                <li>North Bank: 3 Bridges (Odd) ❌</li>
+                <li>South Bank: 3 Bridges (Odd) ❌</li>
+                <li>Middle Island: 5 Bridges (Odd) ❌</li>
+                <li>East Bank: 3 Bridges (Odd) ❌</li>
             </ul>
-            <p>Since all 4 points have an odd number of bridges, you will always get stuck.</p>
-            <button class="close-btn" onclick="toggleModal()">Close</button>
+            <p>Since all 4 spots have an ODD number of bridges, the math guarantees you will get stuck.</p>
+            <button class="close-btn" onclick="toggleModal()">Close Explanation</button>
         </div>
     </div>
 
@@ -134,14 +161,23 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreEl = document.getElementById('score');
+        const statusBar = document.getElementById('statusBar');
         const msgOverlay = document.getElementById('msgOverlay');
+        const stuckLoc = document.getElementById('stuckLoc');
+
+        // Animation Vars
+        let time = 0;
+        let playerX = 300, playerY = 80; // Current rendered position
+        let targetX = 300, targetY = 80; // Where we want to go
 
         // Game State
-        let currentNode = 0; // 0=Top, 1=Middle, 2=Bottom, 3=Right
+        let currentNode = 0; 
         let bridges = [];
         let crossedCount = 0;
 
-        // Map Geometry
+        // Audio Context (Created on first interaction)
+        let audioCtx;
+
         const nodes = {
             0: { x: 300, y: 80, label: "North" },
             1: { x: 300, y: 250, label: "Island" },
@@ -154,69 +190,141 @@
             canvas.height = 500;
             resetGame();
             
-            // Mouse Interaction
-            canvas.addEventListener('mousedown', handleInput);
+            // Mouse & Touch Listeners
+            canvas.addEventListener('mousedown', (e) => handleInput(e.clientX, e.clientY));
             canvas.addEventListener('touchstart', (e) => {
-                e.preventDefault(); // Stop scrolling
-                handleInput(e.touches[0]);
+                e.preventDefault();
+                handleInput(e.touches[0].clientX, e.touches[0].clientY);
             }, {passive: false});
+
+            loop();
+        }
+
+        // --- SOUND GENERATOR (Web Audio API) ---
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'step') {
+                // Happy "Bloop"
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'error') {
+                // Low "Buzz"
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'fail') {
+                // Sad "Wah wah"
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.5);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
         }
 
         function resetGame() {
             msgOverlay.classList.remove('active');
-            currentNode = 0; // Start at North
+            currentNode = 0; 
+            targetX = nodes[0].x;
+            targetY = nodes[0].y;
+            // Teleport player immediately on reset
+            playerX = targetX;
+            playerY = targetY;
+            
             crossedCount = 0;
             scoreEl.innerText = "0";
+            updateStatus("Start: Tap a glowing bridge");
             
-            // Define Bridges [FromNode, ToNode, x, y, width, height, isCrossed]
-            // Coordinates are simplified for hitboxes
             bridges = [
-                { from: 0, to: 1, x: 260, y: 165, w: 20, h: 80, crossed: false }, // Left Top-Mid
-                { from: 0, to: 1, x: 340, y: 165, w: 20, h: 80, crossed: false }, // Right Top-Mid
-                { from: 1, to: 2, x: 260, y: 335, w: 20, h: 80, crossed: false }, // Left Mid-Bot
-                { from: 1, to: 2, x: 340, y: 335, w: 20, h: 80, crossed: false }, // Right Mid-Bot
-                { from: 1, to: 3, x: 425, y: 250, w: 100, h: 20, crossed: false }, // Mid-East
-                { from: 0, to: 3, x: 450, y: 120, w: 20, h: 100, crossed: false, rotation: -0.5 }, // Top-East
-                { from: 2, to: 3, x: 450, y: 380, w: 20, h: 100, crossed: false, rotation: 0.5 }  // Bot-East
+                { from: 0, to: 1, x: 260, y: 165, w: 20, h: 80, crossed: false },
+                { from: 0, to: 1, x: 340, y: 165, w: 20, h: 80, crossed: false },
+                { from: 1, to: 2, x: 260, y: 335, w: 20, h: 80, crossed: false },
+                { from: 1, to: 2, x: 340, y: 335, w: 20, h: 80, crossed: false },
+                { from: 1, to: 3, x: 425, y: 250, w: 100, h: 20, crossed: false },
+                { from: 0, to: 3, x: 450, y: 120, w: 20, h: 100, crossed: false, rotation: -0.5 },
+                { from: 2, to: 3, x: 450, y: 380, w: 20, h: 100, crossed: false, rotation: 0.5 }
             ];
-            
-            draw();
         }
 
-        function handleInput(e) {
-            const rect = canvas.getBoundingClientRect();
-            const clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
-            const clickY = (e.clientY - rect.top) * (canvas.height / rect.height);
+        function updateStatus(msg, isError = false) {
+            statusBar.innerText = msg;
+            if (isError) {
+                statusBar.classList.add('error');
+                setTimeout(() => statusBar.classList.remove('error'), 400);
+            }
+        }
 
-            // Check if clicked a valid bridge
+        function handleInput(clientX, clientY) {
+            initAudio(); // Ensure audio context is ready
+            const rect = canvas.getBoundingClientRect();
+            const clickX = (clientX - rect.left) * (canvas.width / rect.width);
+            const clickY = (clientY - rect.top) * (canvas.height / rect.height);
+
+            let clickedValid = false;
+
             for (let b of bridges) {
-                // Simple distance check for hitbox
                 const dist = Math.sqrt((clickX - b.x) ** 2 + (clickY - b.y) ** 2);
                 
-                if (dist < 40 && !b.crossed) {
-                    // Check if player is adjacent
-                    if (b.from === currentNode || b.to === currentNode) {
-                        crossBridge(b);
+                if (dist < 60) {
+                    if (b.crossed) {
+                        playSound('error');
+                        updateStatus("Already crossed that one!", true);
+                        return;
+                    } 
+                    if (b.from !== currentNode && b.to !== currentNode) {
+                        playSound('error');
+                        updateStatus("Too far! You can't fly.", true);
                         return;
                     }
+                    
+                    // Valid Move
+                    crossBridge(b);
+                    clickedValid = true;
+                    return;
                 }
             }
         }
 
         function crossBridge(b) {
+            playSound('step');
             b.crossed = true;
             crossedCount++;
             scoreEl.innerText = crossedCount;
-
-            // Move Player
-            currentNode = (b.from === currentNode) ? b.to : b.from;
             
-            draw();
+            // Set new Target for animation
+            currentNode = (b.from === currentNode) ? b.to : b.from;
+            targetX = nodes[currentNode].x;
+            targetY = nodes[currentNode].y;
+
+            updateStatus(`Moved to ${nodes[currentNode].label}. Keep going!`);
             checkGameState();
         }
 
         function checkGameState() {
-            // Check if stuck
             let canMove = false;
             for (let b of bridges) {
                 if (!b.crossed && (b.from === currentNode || b.to === currentNode)) {
@@ -225,67 +333,91 @@
             }
 
             if (!canMove && crossedCount < 7) {
-                setTimeout(() => {
-                    document.querySelector('.message-text').innerText = "STUCK! 🚫";
-                    msgOverlay.classList.add('active');
-                }, 500);
-            }
-            // Win condition (Impossible, but good to have logic)
-            else if (crossedCount === 7) {
-                 document.querySelector('.message-text').innerText = "IMPOSSIBLE! 🏆";
-                 msgOverlay.classList.add('active');
+                stuckLoc.innerText = nodes[currentNode].label;
+                setTimeout(() => { 
+                    playSound('fail');
+                    msgOverlay.classList.add('active'); 
+                }, 800);
             }
         }
 
-        function draw() {
-            // Clear
-            ctx.fillStyle = "#34ace0"; // Water
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw Land (Simplified Shapes)
-            ctx.fillStyle = "#27ae60";
+        function loop() {
+            time += 0.05;
             
-            // Top Bank
-            ctx.beginPath(); ctx.rect(0, 0, 600, 130); ctx.fill();
-            // Bottom Bank
-            ctx.beginPath(); ctx.rect(0, 370, 600, 130); ctx.fill();
-            // Middle Island (Oval)
-            ctx.beginPath(); ctx.ellipse(300, 250, 100, 50, 0, 0, Math.PI*2); ctx.fill();
-            // Right Bank
-            ctx.beginPath(); ctx.moveTo(600, 0); ctx.lineTo(480, 0); ctx.lineTo(550, 250); ctx.lineTo(480, 500); ctx.lineTo(600, 500); ctx.fill();
+            // Smooth Player Animation (Linear Interpolation)
+            playerX += (targetX - playerX) * 0.15;
+            playerY += (targetY - playerY) * 0.15;
 
-            // Draw Bridges
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function draw() {
+            // 1. Water with Waves
+            ctx.fillStyle = "#34ace0";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.lineWidth = 2;
+            for(let i=0; i<10; i++) {
+                let y = 50 * i + Math.sin(time + i) * 5;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                // Draw wave line
+                for(let x=0; x<canvas.width; x+=20) {
+                    ctx.lineTo(x, y + Math.sin(x/50 + time)*5);
+                }
+                ctx.stroke();
+            }
+
+            // 2. Land
+            ctx.fillStyle = "#27ae60";
+            ctx.beginPath(); ctx.rect(0, 0, 600, 130); ctx.fill(); // North
+            ctx.beginPath(); ctx.rect(0, 370, 600, 130); ctx.fill(); // South
+            ctx.beginPath(); ctx.ellipse(300, 250, 110, 60, 0, 0, Math.PI*2); ctx.fill(); // Island
+            ctx.beginPath(); ctx.moveTo(600, 0); ctx.lineTo(480, 0); ctx.lineTo(550, 250); ctx.lineTo(480, 500); ctx.lineTo(600, 500); ctx.fill(); // East
+
+            // 3. Bridges
             for (let b of bridges) {
                 ctx.save();
                 ctx.translate(b.x, b.y);
                 if (b.rotation) ctx.rotate(b.rotation);
                 
-                ctx.fillStyle = b.crossed ? "#7f8c8d" : "#d35400";
+                const isConnected = (b.from === currentNode || b.to === currentNode);
+                const isNearPlayer = (Math.abs(playerX - targetX) < 5 && Math.abs(playerY - targetY) < 5); // Only pulse when player stops moving
+
+                if (b.crossed) {
+                    ctx.fillStyle = "#7f8c8d";
+                    ctx.shadowBlur = 0;
+                } else if (isConnected && isNearPlayer) {
+                    const glow = Math.abs(Math.sin(time * 2)) * 15 + 5;
+                    ctx.shadowColor = "#f1c40f";
+                    ctx.shadowBlur = glow;
+                    ctx.fillStyle = "#f1c40f"; 
+                } else {
+                    ctx.fillStyle = "#d35400";
+                    ctx.shadowBlur = 0;
+                }
+
                 ctx.strokeStyle = "#2c3e50";
                 ctx.lineWidth = 2;
-                
-                // Draw Bridge Rect
                 ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
                 ctx.strokeRect(-b.w/2, -b.h/2, b.w, b.h);
-                
                 ctx.restore();
             }
 
-            // Draw Player
-            const p = nodes[currentNode];
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = "black";
-            ctx.fillStyle = "#f1c40f";
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 15, 0, Math.PI*2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-
-            // Player Label
+            // 4. Player
+            ctx.shadowBlur = 10; ctx.shadowColor = "rgba(0,0,0,0.5)";
             ctx.fillStyle = "white";
-            ctx.font = "bold 12px sans-serif";
+            ctx.beginPath(); ctx.arc(playerX, playerY, 15, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            // "YOU" Label
+            ctx.fillStyle = "#2c3e50";
+            ctx.font = "bold 10px sans-serif";
             ctx.textAlign = "center";
-            ctx.fillText("YOU", p.x, p.y - 25);
+            ctx.textBaseline = "middle";
+            ctx.fillText("YOU", playerX, playerY);
         }
 
         function toggleModal() {
@@ -293,7 +425,6 @@
         }
 
         init();
-
     </script>
 </body>
 </html>
