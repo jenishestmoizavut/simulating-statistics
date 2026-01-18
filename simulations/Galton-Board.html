@@ -7,12 +7,12 @@
     <link rel="icon" href="../favicon.ico">
     <style>
         :root {
-            --bg-color: #222f3e; /* Clean Dark Blue-Grey */
-            --accent: #48dbfb;   /* Bright Cyan */
+            --bg-color: #222f3e;
+            --accent: #48dbfb;
             --danger: #ff6b6b;
             --secondary: #576574;
             --text-color: #c8d6e5;
-            --container-bg: #151b23; /* Darker container */
+            --container-bg: #151b23;
         }
 
         body {
@@ -25,7 +25,7 @@
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
-            overflow: hidden;
+            overflow-y: auto; /* ALLOW SCROLLING */
         }
 
         h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
@@ -39,6 +39,8 @@
             gap: 15px;
             margin-bottom: 25px;
             z-index: 10;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         button {
@@ -54,11 +56,11 @@
         }
         
         button:active { transform: scale(0.95); }
-        
         button.flood { background-color: #feca57; }
         button.flood.active { background-color: var(--danger); color: white; }
-        
         button.secondary { background-color: var(--secondary); color: white; }
+        button.mute { background-color: transparent; border: 1px solid #576574; color: #576574; padding: 10px 15px;}
+        button.mute.active { background-color: #576574; color: white; }
 
         .canvas-container {
             border: 2px solid #576574;
@@ -68,6 +70,7 @@
             padding: 0;
             line-height: 0; 
             position: relative;
+            margin-bottom: 50px; /* Space for scrolling */
         }
 
         canvas {
@@ -79,12 +82,13 @@
 <body>
 
     <h1>The Galton Board</h1>
-    <p class="subtitle" id="order">Order from Chaos - The longer you run it, the better it gets ;)</p>
+    <p class="subtitle" id="order">Order from Chaos</p>
 
     <div class="controls">
         <button onclick="spawnBall()">+ Drop 1</button>
         <button class="flood" onclick="toggleFlood()">🌊 Flood Gates</button>
         <button class="secondary" onclick="resetBoard()">Reset</button>
+        <button class="mute" id="muteBtn" onclick="toggleMute()">🔊</button>
     </div>
 
     <div class="canvas-container">
@@ -115,6 +119,11 @@
         let bins = []; 
         let floodInterval = null;
         let maxStackHeight = 0; 
+        
+        // Sound State
+        let audioCtx = null;
+        let isMuted = false;
+        let lastResizeWidth = window.innerWidth;
 
         function init() {
             const maxWidth = 550; 
@@ -128,15 +137,14 @@
             // Sections
             hopperHeight = spacing * 3; 
             const triangleHeight = rows * spacing;
-            binAreaHeight = (ballSize * 2) * 15; // Initially show space for 15 balls
+            binAreaHeight = (ballSize * 2) * 15; 
             pegAreaHeight = hopperHeight + triangleHeight;
             height = pegAreaHeight + binAreaHeight;
             
-            // Adjust for small screens
+            // Adjust for small screens but ensure min height
             if (height > window.innerHeight - 200) {
-                const diff = height - (window.innerHeight - 200);
-                binAreaHeight -= diff;
-                height = pegAreaHeight + binAreaHeight;
+                // Only reduce if significantly too large, but allow scrolling now
+                // binAreaHeight = Math.max(binAreaHeight, 200); 
             }
 
             canvas.width = width;
@@ -149,6 +157,60 @@
                 window.animationRunning = true;
                 loop();
             }
+        }
+
+        // --- AUDIO SYSTEM ---
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (isMuted || !audioCtx) return;
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'hit') {
+                // High pitch click
+                osc.type = 'sine';
+                // Randomize pitch slightly for realism
+                const freq = 800 + Math.random() * 200; 
+                osc.frequency.setValueAtTime(freq, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.05);
+                
+                gain.gain.setValueAtTime(0.05, now); // Very quiet
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'land') {
+                // Low thud
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now + 0.1);
+                
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const btn = document.getElementById('muteBtn');
+            btn.innerText = isMuted ? '🔇' : '🔊';
+            btn.classList.toggle('active');
         }
 
         function createPegs() {
@@ -176,6 +238,8 @@
         }
 
         function spawnBall() {
+            initAudio(); // Try to start audio on user interaction
+            
             const randomOffset = (Math.random() - 0.5) * 5; 
             balls.push({
                 x: width / 2 + randomOffset,
@@ -188,6 +252,7 @@
         }
 
         function toggleFlood() {
+            initAudio();
             const btn = document.querySelector('.flood');
             if (floodInterval) {
                 clearInterval(floodInterval);
@@ -256,6 +321,10 @@
                         const noise = (Math.random() - 0.5) * randomness;
                         b.vx += (bounceDir * kickStrength) + noise; 
                         b.vy *= -elasticity;
+
+                        // Play Sound
+                        // Limit sound frequency to avoid chaos
+                        if (Math.random() > 0.5) playSound('hit');
                     }
                 }
 
@@ -268,6 +337,7 @@
                     if (binIndex >= 0 && binIndex < bins.length) {
                         bins[binIndex]++;
                         if (bins[binIndex] > maxStackHeight) maxStackHeight = bins[binIndex];
+                        playSound('land');
                     }
                     balls.splice(i, 1);
                 }
@@ -311,11 +381,10 @@
             ctx.stroke();
 
             // 4. Draw Stacks (Scalable)
-            let ySpacing = ballSize * 2; // Default height of a ball
+            let ySpacing = ballSize * 2; 
             const maxAllowedPixels = height - pegAreaHeight - 5;
             const currentTallestPixels = maxStackHeight * ySpacing;
             
-            // If stacks get too tall, shrink them to fit
             if (currentTallestPixels > maxAllowedPixels) {
                 ySpacing = maxAllowedPixels / maxStackHeight;
             }
@@ -336,7 +405,7 @@
                     ctx.fill();
                     
                     // Shine
-                    if (ySpacing > 2) { // Only draw detail if big enough
+                    if (ySpacing > 2) {
                         ctx.fillStyle = 'rgba(255,255,255,0.2)';
                         ctx.beginPath();
                         ctx.ellipse(xPos - ballSize*0.3, yPos - ballSize*0.3, ballSize/3, ballSize/3, 0, 0, Math.PI*2);
@@ -353,16 +422,12 @@
                 ctx.fill();
             }
 
-            // 6. --- NEW: Dynamic Y-Axis & Grid ---
-            // Calculate how many balls fit in the current visible height
+            // 6. Dynamic Y-Axis
             const visibleCapacity = Math.floor(maxAllowedPixels / ySpacing);
-            
-            // Smart step calculation (5, 10, 20, 50, etc.)
             let step = 5;
             if (visibleCapacity > 25) step = 10;
             if (visibleCapacity > 50) step = 25;
             if (visibleCapacity > 100) step = 50;
-            if (visibleCapacity > 250) step = 100;
 
             ctx.textAlign = "left";
             ctx.textBaseline = "bottom";
@@ -371,15 +436,11 @@
 
             for (let c = step; c <= visibleCapacity; c += step) {
                 const yPos = height - (c * ySpacing);
-                
-                // Draw Grid Line
                 ctx.beginPath();
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.1)"; // Very faint line
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.1)"; 
                 ctx.moveTo(0, yPos);
                 ctx.lineTo(width, yPos);
                 ctx.stroke();
-
-                // Draw Label (with slight shadow for readability)
                 ctx.fillText(c, 5, yPos - 2);
             }
         }
@@ -392,12 +453,20 @@
 
         init();
         
+        // --- SMARTER RESIZE ---
+        // Only resets if width changes significantly (e.g. rotation or large resize)
+        // Ignores small height changes (like mobile browser bars appearing)
         let resizeTimeout;
         window.addEventListener('resize', () => {
             clearTimeout(resizeTimeout);
             resizeTimeout = setTimeout(() => {
-                resetBoard();
-                init();
+                const newWidth = window.innerWidth;
+                // Only reset if width changed by more than 50px
+                if (Math.abs(newWidth - lastResizeWidth) > 50) {
+                    lastResizeWidth = newWidth;
+                    resetBoard();
+                    init();
+                }
             }, 100);
         });
 
