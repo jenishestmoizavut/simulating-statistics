@@ -23,21 +23,27 @@
             margin: 0; padding: 20px;
             display: flex; flex-direction: column; align-items: center;
             min-height: 100vh;
+            overflow-x: hidden; /* Prevent horizontal scroll */
         }
 
         h1 { margin: 0 0 5px 0; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; color: white; }
         p.subtitle { margin-top: 0; margin-bottom: 30px; color: var(--text-muted); font-size: 0.9rem; }
 
-        /* --- LAYOUT GRID --- */
+        /* --- RESPONSIVE LAYOUT GRID --- */
         .layout-grid {
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: 1fr; /* Default: Stacked */
             gap: 20px;
             width: 100%; max-width: 1000px;
+            margin-bottom: 80px; /* Space for bottom bar */
         }
         
+        /* Desktop: Side-by-side */
         @media(min-width: 800px) {
-            .layout-grid { grid-template-columns: 2fr 1fr; } /* Diagram Left, Stats Right */
+            .layout-grid { 
+                grid-template-columns: 2fr 1fr; 
+                height: 500px; /* Fixed height for desktop to keep it contained */
+            } 
         }
 
         /* --- THE DIAGRAM (Left Side) --- */
@@ -45,10 +51,11 @@
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 20px;
-            height: 400px;
+            min-height: 350px; /* Ensure space on mobile */
+            height: 100%;
             position: relative;
             box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-            overflow: hidden;
+            overflow: hidden; /* Clip arrows that go too far */
         }
 
         /* SVG Arrows */
@@ -72,7 +79,7 @@
         /* Circular Nodes */
         .state-node {
             position: absolute;
-            width: 80px; height: 80px;
+            width: 70px; height: 70px; /* Slightly smaller for better fit */
             background: #0f172a;
             border: 2px solid #475569;
             border-radius: 50%;
@@ -90,8 +97,8 @@
             background: #1e293b;
         }
 
-        .state-icon { font-size: 1.8rem; margin-bottom: 2px; }
-        .state-label { font-size: 0.75rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; }
+        .state-icon { font-size: 1.5rem; margin-bottom: 2px; }
+        .state-label { font-size: 0.7rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; }
         .state-node.active .state-label { color: white; }
 
         /* --- STATS PANEL (Right Side) --- */
@@ -102,6 +109,7 @@
             padding: 25px;
             display: flex; flex-direction: column;
             gap: 15px;
+            overflow-y: auto; /* Scroll if list gets long */
         }
 
         .main-status {
@@ -119,7 +127,6 @@
         .track { width: 100%; height: 8px; background: rgba(0,0,0,0.3); border-radius: 4px; position: relative; overflow: hidden; }
         .fill { height: 100%; border-radius: 4px; transition: width 0.2s; }
         
-        /* The "Target" Marker */
         .marker {
             position: absolute; top: -2px; bottom: -2px; width: 2px; 
             background: white; z-index: 5; box-shadow: 0 0 5px white;
@@ -127,39 +134,54 @@
 
         /* --- CONTROLS BAR (Bottom) --- */
         .controls-bar {
-            position: fixed; bottom: 30px;
-            background: rgba(15, 23, 42, 0.8);
+            position: fixed; bottom: 20px;
+            background: rgba(15, 23, 42, 0.9);
             backdrop-filter: blur(10px);
-            padding: 10px 20px;
+            padding: 10px 15px;
             border-radius: 50px;
             border: 1px solid var(--border);
-            display: flex; gap: 15px; align-items: center;
+            display: flex; gap: 10px; align-items: center;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             z-index: 100;
+            flex-wrap: wrap; /* Wrap on tiny screens */
+            justify-content: center;
         }
 
+        /* FIXED SELECT DROPDOWN */
         select {
-            background: transparent; color: white; border: none; font-weight: bold; cursor: pointer;
-            padding-right: 10px; border-right: 1px solid var(--border);
+            appearance: none; /* Remove default arrow */
+            background-color: var(--bg-color); /* Dark Background */
+            color: white; 
+            border: 1px solid var(--border);
+            padding: 8px 30px 8px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            /* Custom Arrow */
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2338bdf8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px top 50%;
+            background-size: 10px auto;
         }
-        select:focus { outline: none; }
+        select:focus { outline: 2px solid var(--accent); }
+        option { background-color: var(--bg-color); color: white; }
 
         button {
-            background: transparent; border: none; color: var(--text-muted); 
+            background: transparent; border: 1px solid var(--border); color: var(--text-muted); 
             cursor: pointer; padding: 8px 12px; border-radius: 8px; font-weight: 600;
             transition: all 0.2s;
         }
         button:hover { background: rgba(255,255,255,0.1); color: white; }
         
         button.primary {
-            background: var(--accent); color: #0f172a; padding: 8px 20px; border-radius: 20px;
+            background: var(--accent); color: #0f172a; border: none; padding: 8px 24px; border-radius: 20px;
         }
         button.primary:hover { transform: scale(1.05); background: #7dd3fc; }
 
         /* Slider */
-        .speed-control { display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--border); padding-left: 15px; }
-        input[type=range] { width: 80px; accent-color: var(--accent); }
-        .speed-label { font-size: 0.7rem; font-weight: bold; color: var(--text-muted); }
+        .speed-control { display: flex; align-items: center; gap: 8px; }
+        input[type=range] { width: 60px; accent-color: var(--accent); }
+        .speed-label { font-size: 0.65rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; }
 
         /* --- MODAL --- */
         .modal-overlay {
@@ -173,11 +195,11 @@
         }
         textarea {
             width: 100%; height: 100px; background: #0f172a; border: 1px solid #475569; color: white;
-            padding: 10px; border-radius: 8px; font-family: monospace; margin-bottom: 10px;
+            padding: 10px; border-radius: 8px; font-family: monospace; margin-bottom: 10px; box-sizing: border-box;
         }
         input[type=text] {
             width: 100%; background: #0f172a; border: 1px solid #475569; color: white;
-            padding: 8px; border-radius: 8px; margin-bottom: 20px;
+            padding: 8px; border-radius: 8px; margin-bottom: 20px; box-sizing: border-box;
         }
 
     </style>
@@ -221,7 +243,7 @@
     <div class="controls-bar">
         <select id="presetSelect" onchange="loadPreset()">
             <option value="weather">Weather (2)</option>
-            <option value="brand">Brand Loyalty (2)</option>
+            <option value="brand">Brand (2)</option>
             <option value="life">Dev Life (3)</option>
             <option value="custom">Custom...</option>
         </select>
@@ -231,11 +253,13 @@
         <button onclick="resetSim()" title="Reset">↺</button>
         
         <div class="speed-control">
-            <span class="speed-label">SPEED</span>
-            <input type="range" id="speedRange" min="1" max="100" value="10">
+            <div style="display:flex; flex-direction:column; align-items:center;">
+                <span class="speed-label">Speed</span>
+                <input type="range" id="speedRange" min="1" max="100" value="10">
+            </div>
         </div>
         
-        <button onclick="toggleMute()" id="muteBtn" style="opacity:0.6">🔊</button>
+        <button onclick="toggleMute()" id="muteBtn" style="opacity:0.6; padding:8px;">🔊</button>
     </div>
 
     <div class="modal-overlay" id="customModal">
@@ -387,7 +411,10 @@
             
             // Layout Logic: Circular
             const positions = [];
-            const r = count === 2 ? 120 : 130;
+            
+            // Adaptive Radius: Smaller on mobile, bigger on desktop
+            const minDim = Math.min(w, h);
+            const r = count === 2 ? minDim * 0.25 : minDim * 0.3;
             const centerOffset = count === 2 ? Math.PI : -Math.PI/2;
 
             for(let i=0; i<count; i++) {
@@ -432,20 +459,18 @@
             let d = "";
 
             if(from === to) {
-                // Loop: Draw a little circle above the node
-                const nx = p1.x - 40; // Offset based on node radius
-                const ny = p1.y - 40;
-                d = `M ${p1.x} ${p1.y-40} C ${p1.x-50} ${p1.y-100}, ${p1.x+50} ${p1.y-100}, ${p1.x} ${p1.y-40}`;
+                // Loop
+                const nx = p1.x - 35; 
+                const ny = p1.y - 35;
+                d = `M ${p1.x} ${p1.y-35} C ${p1.x-40} ${p1.y-80}, ${p1.x+40} ${p1.y-80}, ${p1.x} ${p1.y-35}`;
             } else {
-                // Curved Line between nodes
+                // Curved Line
                 const mx = (p1.x + p2.x)/2;
                 const my = (p1.y + p2.y)/2;
                 
-                // Offset curve logic
                 let offset = 30;
-                if(config.matrix.length === 2 && from === 1) offset = -30; // Flip for bottom curve
+                if(config.matrix.length === 2 && from === 1) offset = -30;
                 
-                // Calculate normal vector for curve
                 const dx = p2.x - p1.x;
                 const dy = p2.y - p1.y;
                 const dist = Math.sqrt(dx*dx + dy*dy);
@@ -502,7 +527,6 @@
             // Visuals
             const path = document.getElementById(`path-${currentState}-${next}`);
             if(path) {
-                // Swap marker color for glow effect
                 path.setAttribute("marker-end", "url(#arrowhead-active)");
                 path.classList.add('active-path');
                 setTimeout(()=> {
@@ -520,15 +544,11 @@
         }
 
         function updateUI() {
-            // Nodes
             document.querySelectorAll('.state-node').forEach(b => b.classList.remove('active'));
             document.getElementById(`node-${currentState}`).classList.add('active');
-            
-            // Icon
             document.getElementById('mainIcon').innerText = config.icons[currentState];
-
-            // Stats
             document.getElementById('stepEl').innerText = totalSteps.toLocaleString();
+            
             counts.forEach((c, i) => {
                 const pct = totalSteps===0 ? 0 : (c/totalSteps * 100).toFixed(1);
                 document.getElementById(`pct-${i}`).innerText = pct + "%";
@@ -585,7 +605,7 @@
 
         // Init
         window.onload = () => loadPreset();
-        window.onresize = () => renderDiagram(); // Re-center diagram on resize
+        window.onresize = () => renderDiagram(); 
     </script>
 </body>
 </html>
