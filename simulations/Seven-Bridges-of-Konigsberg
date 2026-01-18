@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seven Bridges of Königsberg</title>
+    <link rel="icon" href="../favicon.ico">
+    <style>
+        :root {
+            --bg-color: #222f3e;
+            --water: #34ace0;
+            --land: #27ae60;
+            --bridge: #d35400;
+            --bridge-crossed: #7f8c8d;
+            --text-color: #ecf0f1;
+            --accent: #f1c40f;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; }
+        p.subtitle { color: #bdc3c7; margin-top: 0; margin-bottom: 25px; }
+
+        .controls {
+            display: flex; gap: 15px; margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 24px; border-radius: 25px; border: none;
+            font-size: 1rem; font-weight: bold; cursor: pointer;
+            background: #576574; color: white; transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.95); }
+        button.primary { background-color: var(--accent); color: #2c3e50; }
+
+        .game-container {
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #576574;
+        }
+
+        canvas { display: block; cursor: pointer; }
+
+        /* Messages */
+        .message-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .message-overlay.active { opacity: 1; pointer-events: auto; }
+        .message-text { font-size: 2rem; font-weight: bold; margin-bottom: 20px; color: #e74c3c; }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s; backdrop-filter: blur(5px);
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-card {
+            background: white; padding: 30px; border-radius: 20px;
+            max-width: 600px; width: 90%; color: #2d3436;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            transform: translateY(20px); transition: transform 0.3s;
+        }
+        .modal-overlay.active .modal-card { transform: translateY(0); }
+        .modal-card h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
+        .modal-card p { line-height: 1.6; }
+        .highlight { color: #e74c3c; font-weight: bold; }
+        .close-btn { margin-top: 20px; width: 100%; background: #2c3e50; color: white; }
+
+        .stats { margin-top: 10px; font-family: monospace; color: #bdc3c7; }
+    </style>
+</head>
+<body>
+
+    <h1>The Seven Bridges</h1>
+    <p class="subtitle">Can you cross every bridge exactly once?</p>
+
+    <div class="controls">
+        <button class="primary" onclick="resetGame()">Reset Map</button>
+        <button onclick="toggleModal()">?</button>
+    </div>
+
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div class="message-overlay" id="msgOverlay">
+            <div class="message-text">STUCK! 🚫</div>
+            <button class="primary" onclick="resetGame()">Try Again</button>
+        </div>
+    </div>
+
+    <div class="stats">
+        Bridges Crossed: <span id="score">0</span> / 7
+    </div>
+
+    <div class="modal-overlay" id="modal">
+        <div class="modal-card">
+            <h2>Why is this impossible?</h2>
+            <p>Don't worry, you didn't fail. The game is rigged.</p>
+            <p>In 1736, mathematician <strong>Leonhard Euler</strong> proved that this path doesn't exist. This problem actually invented Graph Theory!</p>
+            
+            <h3>The Logic (Euler's Path):</h3>
+            <p>To cross every bridge exactly once, a landmass must have an <strong>Even</strong> number of bridges connected to it (enter one, leave one).</p>
+            <p>However, look at the map:</p>
+            <ul>
+                <li>Top Bank: <span class="highlight">3 Bridges</span> (Odd)</li>
+                <li>Bottom Bank: <span class="highlight">3 Bridges</span> (Odd)</li>
+                <li>Middle Island: <span class="highlight">5 Bridges</span> (Odd)</li>
+                <li>Right Bank: <span class="highlight">3 Bridges</span> (Odd)</li>
+            </ul>
+            <p>Since all 4 points have an odd number of bridges, you will always get stuck.</p>
+            <button class="close-btn" onclick="toggleModal()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const msgOverlay = document.getElementById('msgOverlay');
+
+        // Game State
+        let currentNode = 0; // 0=Top, 1=Middle, 2=Bottom, 3=Right
+        let bridges = [];
+        let crossedCount = 0;
+
+        // Map Geometry
+        const nodes = {
+            0: { x: 300, y: 80, label: "North" },
+            1: { x: 300, y: 250, label: "Island" },
+            2: { x: 300, y: 420, label: "South" },
+            3: { x: 550, y: 250, label: "East" }
+        };
+
+        function init() {
+            canvas.width = 600;
+            canvas.height = 500;
+            resetGame();
+            
+            // Mouse Interaction
+            canvas.addEventListener('mousedown', handleInput);
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Stop scrolling
+                handleInput(e.touches[0]);
+            }, {passive: false});
+        }
+
+        function resetGame() {
+            msgOverlay.classList.remove('active');
+            currentNode = 0; // Start at North
+            crossedCount = 0;
+            scoreEl.innerText = "0";
+            
+            // Define Bridges [FromNode, ToNode, x, y, width, height, isCrossed]
+            // Coordinates are simplified for hitboxes
+            bridges = [
+                { from: 0, to: 1, x: 260, y: 165, w: 20, h: 80, crossed: false }, // Left Top-Mid
+                { from: 0, to: 1, x: 340, y: 165, w: 20, h: 80, crossed: false }, // Right Top-Mid
+                { from: 1, to: 2, x: 260, y: 335, w: 20, h: 80, crossed: false }, // Left Mid-Bot
+                { from: 1, to: 2, x: 340, y: 335, w: 20, h: 80, crossed: false }, // Right Mid-Bot
+                { from: 1, to: 3, x: 425, y: 250, w: 100, h: 20, crossed: false }, // Mid-East
+                { from: 0, to: 3, x: 450, y: 120, w: 20, h: 100, crossed: false, rotation: -0.5 }, // Top-East
+                { from: 2, to: 3, x: 450, y: 380, w: 20, h: 100, crossed: false, rotation: 0.5 }  // Bot-East
+            ];
+            
+            draw();
+        }
+
+        function handleInput(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const clickY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            // Check if clicked a valid bridge
+            for (let b of bridges) {
+                // Simple distance check for hitbox
+                const dist = Math.sqrt((clickX - b.x) ** 2 + (clickY - b.y) ** 2);
+                
+                if (dist < 40 && !b.crossed) {
+                    // Check if player is adjacent
+                    if (b.from === currentNode || b.to === currentNode) {
+                        crossBridge(b);
+                        return;
+                    }
+                }
+            }
+        }
+
+        function crossBridge(b) {
+            b.crossed = true;
+            crossedCount++;
+            scoreEl.innerText = crossedCount;
+
+            // Move Player
+            currentNode = (b.from === currentNode) ? b.to : b.from;
+            
+            draw();
+            checkGameState();
+        }
+
+        function checkGameState() {
+            // Check if stuck
+            let canMove = false;
+            for (let b of bridges) {
+                if (!b.crossed && (b.from === currentNode || b.to === currentNode)) {
+                    canMove = true;
+                }
+            }
+
+            if (!canMove && crossedCount < 7) {
+                setTimeout(() => {
+                    document.querySelector('.message-text').innerText = "STUCK! 🚫";
+                    msgOverlay.classList.add('active');
+                }, 500);
+            }
+            // Win condition (Impossible, but good to have logic)
+            else if (crossedCount === 7) {
+                 document.querySelector('.message-text').innerText = "IMPOSSIBLE! 🏆";
+                 msgOverlay.classList.add('active');
+            }
+        }
+
+        function draw() {
+            // Clear
+            ctx.fillStyle = "#34ace0"; // Water
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Land (Simplified Shapes)
+            ctx.fillStyle = "#27ae60";
+            
+            // Top Bank
+            ctx.beginPath(); ctx.rect(0, 0, 600, 130); ctx.fill();
+            // Bottom Bank
+            ctx.beginPath(); ctx.rect(0, 370, 600, 130); ctx.fill();
+            // Middle Island (Oval)
+            ctx.beginPath(); ctx.ellipse(300, 250, 100, 50, 0, 0, Math.PI*2); ctx.fill();
+            // Right Bank
+            ctx.beginPath(); ctx.moveTo(600, 0); ctx.lineTo(480, 0); ctx.lineTo(550, 250); ctx.lineTo(480, 500); ctx.lineTo(600, 500); ctx.fill();
+
+            // Draw Bridges
+            for (let b of bridges) {
+                ctx.save();
+                ctx.translate(b.x, b.y);
+                if (b.rotation) ctx.rotate(b.rotation);
+                
+                ctx.fillStyle = b.crossed ? "#7f8c8d" : "#d35400";
+                ctx.strokeStyle = "#2c3e50";
+                ctx.lineWidth = 2;
+                
+                // Draw Bridge Rect
+                ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
+                ctx.strokeRect(-b.w/2, -b.h/2, b.w, b.h);
+                
+                ctx.restore();
+            }
+
+            // Draw Player
+            const p = nodes[currentNode];
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = "black";
+            ctx.fillStyle = "#f1c40f";
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 15, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Player Label
+            ctx.fillStyle = "white";
+            ctx.font = "bold 12px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("YOU", p.x, p.y - 25);
+        }
+
+        function toggleModal() {
+            document.getElementById('modal').classList.toggle('active');
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
