@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-Means Interactive | Simulating Statistics</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --subtext: #94a3b8;
+            --primary: #3b82f6;
+            --accent: #f59e0b;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Modern Glass/Card Header */
+        header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        
+        h1 { margin: 0; font-weight: 700; letter-spacing: -0.025em; }
+        p { color: var(--subtext); margin-top: 8px; font-size: 0.9rem; }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 24px;
+            max-width: 1200px;
+            width: 100%;
+            background: var(--card);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Sidebar Controls */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .control-group {
+            background: rgba(0,0,0,0.2);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--subtext);
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            width: 100%;
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--primary);
+            margin-top: -6px;
+            cursor: pointer;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        /* Buttons */
+        .btn-row { display: flex; gap: 10px; }
+        
+        button {
+            flex: 1;
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-primary:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+
+        .btn-secondary { background: #334155; color: white; }
+        .btn-secondary:hover { background: #475569; }
+
+        .btn-accent { background: var(--accent); color: #0f172a; }
+        .btn-accent:hover { filter: brightness(1.1); }
+
+        /* Canvas Area */
+        .viz-wrapper {
+            position: relative;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        canvas:active { cursor: grabbing; }
+
+        /* Floating HUD */
+        .hud {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px;
+            border-radius: 99px;
+            font-size: 0.85rem;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--subtext); }
+        .dot.active { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        
+        /* Tooltip */
+        .tooltip {
+            position: absolute;
+            bottom: 16px;
+            right: 16px;
+            color: rgba(255,255,255,0.4);
+            font-size: 0.8rem;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>K-Means Clustering</h1>
+        <p>Drag centroids to disrupt the equilibrium</p>
+    </header>
+
+    <div class="app-container">
+        <div class="controls">
+            <div class="control-group">
+                <label>Configuration</label>
+                <div style="margin-bottom: 8px; display:flex; justify-content:space-between;">
+                    <span>Clusters (K)</span>
+                    <span id="kVal">3</span>
+                </div>
+                <input type="range" id="kInput" min="2" max="6" value="3">
+                
+                <div style="margin-top: 16px; margin-bottom: 8px; display:flex; justify-content:space-between;">
+                    <span>Points (N)</span>
+                    <span id="nVal">300</span>
+                </div>
+                <input type="range" id="nInput" min="50" max="500" value="300" step="50">
+            </div>
+
+            <div class="control-group">
+                <label>Actions</label>
+                <div class="btn-row">
+                    <button class="btn-secondary" onclick="resetData()">New Data</button>
+                    <button class="btn-secondary" onclick="initCentroids()">Reset K</button>
+                </div>
+                <div class="btn-row" style="margin-top: 12px;">
+                    <button class="btn-primary" id="stepBtn" onclick="manualStep()">Step</button>
+                    <button class="btn-accent" id="playBtn" onclick="togglePlay()">Auto Run</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Stats</label>
+                <div style="font-size: 0.9rem; color: var(--subtext);">
+                    Iteration: <span id="iterDisplay" style="color:white; font-weight:bold;">0</span><br>
+                    Status: <span id="statusDisplay" style="color:var(--accent);">Ready</span>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>Visualization</label>
+                <label style="display:flex; align-items:center; gap:8px; text-transform:none; cursor:pointer;">
+                    <input type="checkbox" id="voronoiToggle" checked> Show Voronoi Regions
+                </label>
+            </div>
+        </div>
+
+        <div class="viz-wrapper">
+            <div class="hud">
+                <div class="dot" id="liveDot"></div>
+                <span id="phaseDisplay">Initializing...</span>
+            </div>
+            <canvas id="canvas" width="900" height="600"></canvas>
+            <div class="tooltip">Tip: Drag the big circles to move centroids</div>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // UI Refs
+    const kInput = document.getElementById('kInput');
+    const nInput = document.getElementById('nInput');
+    const iterDisplay = document.getElementById('iterDisplay');
+    const statusDisplay = document.getElementById('statusDisplay');
+    const phaseDisplay = document.getElementById('phaseDisplay');
+    const liveDot = document.getElementById('liveDot');
+    const playBtn = document.getElementById('playBtn');
+    const voronoiToggle = document.getElementById('voronoiToggle');
+
+    // Config
+    const palette = [
+        { main: '#f43f5e', light: 'rgba(244, 63, 94, 0.15)' }, // Rose
+        { main: '#3b82f6', light: 'rgba(59, 130, 246, 0.15)' }, // Blue
+        { main: '#10b981', light: 'rgba(16, 185, 129, 0.15)' }, // Emerald
+        { main: '#f59e0b', light: 'rgba(245, 158, 11, 0.15)' }, // Amber
+        { main: '#8b5cf6', light: 'rgba(139, 92, 246, 0.15)' }, // Violet
+        { main: '#06b6d4', light: 'rgba(6, 182, 212, 0.15)' }   // Cyan
+    ];
+
+    // State
+    let points = [];
+    let centroids = [];
+    let K = 3;
+    let N = 300;
+    let iteration = 0;
+    let isPlaying = false;
+    let animationId;
+    let draggedCentroid = null;
+    let converged = false;
+
+    // --- Init ---
+    function init() {
+        setupEvents();
+        resetData();
+    }
+
+    function setupEvents() {
+        kInput.addEventListener('input', (e) => { 
+            document.getElementById('kVal').innerText = e.target.value;
+            K = parseInt(e.target.value);
+            initCentroids(); // Re-roll centroids if K changes
+        });
+        
+        nInput.addEventListener('input', (e) => {
+            document.getElementById('nVal').innerText = e.target.value;
+            N = parseInt(e.target.value);
+            resetData();
+        });
+
+        voronoiToggle.addEventListener('change', draw);
+
+        // Dragging Logic
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        // Mobile Support
+        canvas.addEventListener('touchstart', handleTouchStart, {passive: false});
+        canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
+        canvas.addEventListener('touchend', handleMouseUp);
+    }
+
+    // --- Core Logic ---
+
+   // --- Advanced Data Generation ---
+
+    function resetData() {
+        points = [];
+        iteration = 0;
+        converged = false;
+        pause();
+
+        // 1. Randomize how many points are in each cluster (Uneven populations)
+        // We will distribute N points across K clusters randomly
+        let remainingPoints = N;
+        let clusterSizes = [];
+        for (let i = 0; i < K - 1; i++) {
+            // Give each cluster a slice of the remaining points (randomized)
+            let size = Math.floor(Math.random() * (remainingPoints / (K - i)) * 1.5);
+            size = Math.max(10, size); // Minimum 10 points
+            clusterSizes.push(size);
+            remainingPoints -= size;
+        }
+        clusterSizes.push(remainingPoints); // Last cluster gets the rest
+
+        // 2. Generate the clouds
+        clusterSizes.forEach(size => {
+            // Random center
+            let cx = Math.random() * (canvas.width * 0.8) + canvas.width * 0.1;
+            let cy = Math.random() * (canvas.height * 0.8) + canvas.height * 0.1;
+            
+            // Random "Spread" (Standard Deviation)
+            // Some clusters are tight (15px), some are wide (50px)
+            let spreadX = Math.random() * 40 + 15; 
+            let spreadY = Math.random() * 40 + 15; 
+
+            for(let i = 0; i < size; i++) {
+                // Box-Muller Transform for Normal Distribution (The "Round" look)
+                let u = 0, v = 0;
+                while(u === 0) u = Math.random(); 
+                while(v === 0) v = Math.random();
+                
+                // Standard Normal variates
+                let z1 = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+                let z2 = Math.sqrt(-2.0 * Math.log(u)) * Math.sin(2.0 * Math.PI * v);
+                
+                points.push({
+                    x: cx + z1 * spreadX,
+                    y: cy + z2 * spreadY,
+                    cluster: -1
+                });
+            }
+        });
+
+        initCentroids();
+    }
+    function initCentroids() {
+        centroids = [];
+        iteration = 0;
+        converged = false;
+        
+        // Pick random unique points as start (Forgy init)
+        let indices = new Set();
+        while(centroids.length < K) {
+            let idx = Math.floor(Math.random() * points.length);
+            if(!indices.has(idx)) {
+                indices.add(idx);
+                centroids.push({
+                    x: points[idx].x,
+                    y: points[idx].y,
+                    color: palette[centroids.length % palette.length]
+                });
+            }
+        }
+        assignClusters();
+        updateUI();
+        draw();
+    }
+
+    function assignClusters() {
+        let changed = false;
+        points.forEach(p => {
+            let minDist = Infinity;
+            let bestK = -1;
+            centroids.forEach((c, i) => {
+                let d = (p.x - c.x)**2 + (p.y - c.y)**2; // Squared dist is faster
+                if(d < minDist) {
+                    minDist = d;
+                    bestK = i;
+                }
+            });
+            if(p.cluster !== bestK) changed = true;
+            p.cluster = bestK;
+        });
+        return changed;
+    }
+
+    function updateCentroids() {
+        let sums = centroids.map(() => ({x:0, y:0, count:0}));
+        
+        points.forEach(p => {
+            if(p.cluster !== -1) {
+                sums[p.cluster].x += p.x;
+                sums[p.cluster].y += p.y;
+                sums[p.cluster].count++;
+            }
+        });
+
+        let maxShift = 0;
+
+        centroids.forEach((c, i) => {
+            // If dragging, don't auto-update THAT centroid
+            if(draggedCentroid === i) return; 
+
+            if(sums[i].count > 0) {
+                let nx = sums[i].x / sums[i].count;
+                let ny = sums[i].y / sums[i].count;
+                let shift = Math.sqrt((c.x - nx)**2 + (c.y - ny)**2);
+                maxShift = Math.max(maxShift, shift);
+                
+                // Lerp for smooth animation if playing
+                if(isPlaying) {
+                    c.x += (nx - c.x) * 0.3; // Animation ease
+                    c.y += (ny - c.y) * 0.3;
+                } else {
+                    c.x = nx;
+                    c.y = ny;
+                }
+            }
+        });
+
+        return maxShift;
+    }
+
+    function stepLoop() {
+        assignClusters();
+        let shift = updateCentroids();
+        
+        if(!draggedCentroid) {
+            iteration++;
+            // Convergence criteria
+            if(shift < 0.1 && isPlaying) {
+                converged = true;
+                pause();
+                statusDisplay.innerText = "Converged";
+                statusDisplay.style.color = "#10b981";
+            }
+        }
+        
+        updateUI();
+        draw();
+        
+        if(isPlaying && !converged) {
+            animationId = requestAnimationFrame(stepLoop);
+        }
+    }
+
+    function manualStep() {
+        pause();
+        assignClusters();
+        updateCentroids();
+        iteration++;
+        updateUI();
+        draw();
+    }
+
+    function togglePlay() {
+        if(isPlaying) {
+            pause();
+        } else {
+            isPlaying = true;
+            converged = false;
+            playBtn.innerText = "Pause";
+            playBtn.classList.replace('btn-accent', 'btn-secondary');
+            liveDot.classList.add('active');
+            phaseDisplay.innerText = "Optimizing...";
+            stepLoop();
+        }
+    }
+
+    function pause() {
+        isPlaying = false;
+        cancelAnimationFrame(animationId);
+        playBtn.innerText = "Auto Run";
+        playBtn.classList.replace('btn-secondary', 'btn-accent');
+        liveDot.classList.remove('active');
+        phaseDisplay.innerText = converged ? "Stable" : "Paused";
+    }
+
+    function updateUI() {
+        iterDisplay.innerText = iteration;
+        if(!converged && !isPlaying) statusDisplay.innerText = "Manual Mode";
+    }
+
+    // --- Interaction ---
+    function getMousePos(evt) {
+        let rect = canvas.getBoundingClientRect();
+        let clientX = evt.clientX || (evt.touches ? evt.touches[0].clientX : 0);
+        let clientY = evt.clientY || (evt.touches ? evt.touches[0].clientY : 0);
+        return {
+            x: (clientX - rect.left) * (canvas.width / rect.width),
+            y: (clientY - rect.top) * (canvas.height / rect.height)
+        };
+    }
+
+    function handleMouseDown(e) {
+        if(e.type === 'touchstart') e.preventDefault();
+        let m = getMousePos(e);
+        
+        // Find clicked centroid
+        centroids.forEach((c, i) => {
+            let d = Math.sqrt((m.x - c.x)**2 + (m.y - c.y)**2);
+            if(d < 20) { // Hit radius
+                draggedCentroid = i;
+                converged = false; // Break convergence
+                statusDisplay.innerText = "User Interaction";
+                statusDisplay.style.color = "#f59e0b";
+            }
+        });
+    }
+
+    function handleMouseMove(e) {
+        if(e.type === 'touchmove') e.preventDefault();
+        if(draggedCentroid !== null) {
+            let m = getMousePos(e);
+            centroids[draggedCentroid].x = m.x;
+            centroids[draggedCentroid].y = m.y;
+            assignClusters(); // Live update of points
+            draw();
+        }
+    }
+
+    function handleMouseUp() {
+        draggedCentroid = null;
+    }
+    
+    function handleTouchStart(e) { handleMouseDown(e); }
+    function handleTouchMove(e) { handleMouseMove(e); }
+
+    // --- Rendering ---
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. Voronoi Background (Pixel Optimization)
+        if(voronoiToggle.checked && centroids.length > 0) {
+            // We use a low-res grid for performance
+            const resolution = 4; 
+            for(let y = 0; y < canvas.height; y += resolution) {
+                for(let x = 0; x < canvas.width; x += resolution) {
+                    let minDist = Infinity;
+                    let closest = 0;
+                    // Unrolled loop for speed
+                    for(let k=0; k<centroids.length; k++) {
+                        let d = (x - centroids[k].x)**2 + (y - centroids[k].y)**2;
+                        if(d < minDist) { minDist = d; closest = k; }
+                    }
+                    ctx.fillStyle = centroids[closest].color.light;
+                    ctx.fillRect(x, y, resolution, resolution);
+                }
+            }
+        }
+
+        // 2. Points
+        points.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+            ctx.fillStyle = p.cluster === -1 ? '#475569' : centroids[p.cluster].color.main;
+            ctx.fill();
+        });
+
+        // 3. Centroids (Draggable Handles)
+        centroids.forEach((c, i) => {
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, 12, 0, Math.PI*2);
+            ctx.fillStyle = c.color.main;
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 10;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            // White ring
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+
+            // Drag indicator
+            if(draggedCentroid === i) {
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 20, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.stroke();
+            }
+        });
+    }
+
+    // Start
+    init();
+
+</script>
+</body>
+</html>
