@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survival Analysis | Kaplan-Meier vs Nelson-Aalen</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --subtext: #94a3b8;
+            --event: #f43f5e; /* Red for Death */
+            --censor: #10b981; /* Green for Censored */
+            --curve: #3b82f6; /* Blue for KM */
+            --curve-na: #f59e0b; /* Orange for NA */
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { margin: 0; font-weight: 700; }
+        p { color: var(--subtext); margin-top: 5px; font-size: 0.9rem; }
+
+        .container {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        /* --- CARD STYLES --- */
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.05);
+            position: relative;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 10px;
+        }
+
+        /* --- TIMELINE AREA --- */
+        .timeline-area {
+            position: relative;
+            height: 160px;
+            cursor: pointer;
+        }
+        
+        /* The Timeline Axis */
+        .axis-line {
+            position: absolute;
+            bottom: 30px;
+            left: 50px;
+            right: 50px;
+            height: 2px;
+            background: var(--subtext);
+        }
+        .axis-label {
+            position: absolute;
+            bottom: 5px;
+            font-size: 0.75rem;
+            color: var(--subtext);
+        }
+
+        /* Patient Dots */
+        .patient {
+            position: absolute;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: grab;
+            transition: background-color 0.2s;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            border: 2px solid white;
+            z-index: 10;
+        }
+        .patient:active { cursor: grabbing; scale: 1.2; }
+        .patient.event { background-color: var(--event); }
+        .patient.censored { background-color: var(--censor); border-radius: 4px; }
+
+        /* Stems */
+        .stem {
+            position: absolute;
+            width: 2px;
+            background: rgba(255,255,255,0.15); /* Faint line */
+            transform: translateX(-50%);
+            pointer-events: none;
+        }
+
+        /* --- GRAPH AREA --- */
+        .graph-wrapper {
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .controls { display: flex; gap: 10px; }
+
+        button {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: var(--text);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        button:hover { background: rgba(255,255,255,0.2); }
+        
+        button.active.km { background: var(--curve); color: white; }
+        button.active.na { background: var(--curve-na); color: white; }
+        
+        .reset-btn { margin-left: auto; background: transparent; border: 1px solid var(--subtext); color: var(--subtext); }
+        .reset-btn:hover { border-color: var(--event); color: var(--event); background: transparent; }
+
+        canvas { width: 100%; height: 100%; margin-top: 10px; }
+
+        /* Tooltip */
+        .tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            border: 1px solid rgba(255,255,255,0.2);
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Survival Estimator</h1>
+        <p>Interactive Kaplan-Meier vs. Nelson-Aalen (Exponential Approx)</p>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <span><strong>Patient Timeline</strong></span>
+                <span style="font-size: 0.8rem; color: var(--subtext);">
+                    <span style="color:var(--event)">● Death</span> 
+                    <span style="color:var(--censor)">■ Censored</span>
+                </span>
+            </div>
+            <div class="timeline-area" id="trackArea">
+                </div>
+            <div class="tooltip" id="tooltip"></div>
+        </div>
+
+        <div class="card graph-wrapper">
+            <div class="card-header" style="margin-bottom: 0; border: none;">
+                <div class="controls">
+                    <button class="active km" id="btnKM" onclick="setMode('KM')">Kaplan-Meier S(t)</button>
+                    <button class="na" id="btnNA" onclick="setMode('NA')">Nelson-Aalen e^(-Λ)</button>
+                </div>
+                <button class="reset-btn" onclick="resetData()">Reset Data</button>
+            </div>
+            <canvas id="chartCanvas"></canvas>
+        </div>
+    </div>
+
+<script>
+    // --- STATE ---
+    let patients = [];
+    let mode = 'KM'; // 'KM' or 'NA'
+    let draggingId = null;
+
+    const trackArea = document.getElementById('trackArea');
+    const tooltip = document.getElementById('tooltip');
+    const canvas = document.getElementById('chartCanvas');
+    const ctx = canvas.getContext('2d');
+    const btnKM = document.getElementById('btnKM');
+    const btnNA = document.getElementById('btnNA');
+
+    // Canvas Sizing
+    function resizeCanvas() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight - 60; 
+        drawChart();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // --- INIT ---
+    function resetData() {
+        patients = [
+            { id: 1, time: 20, type: 'event', y: 40 },
+            { id: 2, time: 45, type: 'event', y: 70 },
+            { id: 3, time: 55, type: 'censored', y: 100 },
+            { id: 4, time: 70, type: 'event', y: 55 },
+            { id: 5, time: 85, type: 'censored', y: 85 }
+        ];
+        renderPatients();
+        drawChart();
+    }
+
+    // --- TIMELINE INTERACTION ---
+    trackArea.addEventListener('mousedown', (e) => {
+        if(e.target !== trackArea && !e.target.classList.contains('stem')) return;
+        
+        const rect = trackArea.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const width = rect.width - 100; // 50px padding on each side
+        const time = Math.max(0, Math.min(100, ( (x - 50) / width ) * 100 ));
+        
+        patients.push({
+            id: Date.now(),
+            time: time,
+            type: 'event',
+            y: Math.random() * 80 + 20 // Random height 20-100
+        });
+        renderPatients();
+        drawChart();
+    });
+
+    function renderPatients() {
+        trackArea.innerHTML = '';
+        
+        // Draw Axis Line & Labels
+        const axis = document.createElement('div');
+        axis.className = 'axis-line';
+        trackArea.appendChild(axis);
+        
+        const label0 = document.createElement('div');
+        label0.className = 'axis-label';
+        label0.innerText = 't=0';
+        label0.style.left = '50px';
+        trackArea.appendChild(label0);
+
+        const label100 = document.createElement('div');
+        label100.className = 'axis-label';
+        label100.innerText = 't=100';
+        label100.style.right = '50px';
+        trackArea.appendChild(label100);
+
+        const width = trackArea.clientWidth - 100;
+
+        patients.forEach(p => {
+            const left = 50 + (p.time / 100) * width;
+            const bottom = 30; // Axis height
+            const height = p.y;
+
+            // Stem (Vertical Line)
+            const stem = document.createElement('div');
+            stem.className = 'stem';
+            stem.style.left = left + 'px';
+            stem.style.bottom = bottom + 'px';
+            stem.style.height = height + 'px';
+            trackArea.appendChild(stem);
+
+            // Dot
+            const dot = document.createElement('div');
+            dot.className = `patient ${p.type}`;
+            dot.style.left = left + 'px';
+            dot.style.bottom = (bottom + height) + 'px';
+            
+            dot.onmousedown = (e) => startDrag(e, p.id);
+            dot.onclick = (e) => { e.stopPropagation(); toggleType(p.id); };
+            dot.onmouseenter = (e) => showTooltip(e, p);
+            dot.onmouseleave = () => hideTooltip();
+
+            trackArea.appendChild(dot);
+        });
+    }
+
+    function toggleType(id) {
+        if(isDragging) return; 
+        const p = patients.find(x => x.id === id);
+        p.type = p.type === 'event' ? 'censored' : 'event';
+        renderPatients();
+        drawChart();
+    }
+
+    // --- DRAG LOGIC ---
+    let isDragging = false;
+    let dragStartPos = 0;
+
+    function startDrag(e, id) {
+        e.stopPropagation();
+        draggingId = id;
+        isDragging = false;
+        dragStartPos = e.clientX;
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', stopDrag);
+    }
+
+    function onDrag(e) {
+        if (!draggingId) return;
+        if (Math.abs(e.clientX - dragStartPos) > 3) isDragging = true;
+
+        const rect = trackArea.getBoundingClientRect();
+        const width = rect.width - 100;
+        let x = e.clientX - rect.left - 50; 
+        let newTime = (x / width) * 100;
+        newTime = Math.max(0, Math.min(100, newTime));
+
+        const p = patients.find(x => x.id === draggingId);
+        p.time = newTime;
+        renderPatients();
+        drawChart();
+    }
+
+    function stopDrag() {
+        draggingId = null;
+        document.removeEventListener('mousemove', onDrag);
+        document.removeEventListener('mouseup', stopDrag);
+        setTimeout(() => isDragging = false, 50);
+    }
+
+    // --- MATH & CHART ---
+
+    function calculateStats() {
+        let sorted = [...patients].sort((a, b) => a.time - b.time);
+        let timeline = [];
+        let n = sorted.length; 
+        let S_KM = 1.0; 
+        let H_NA = 0.0; // Cumulative Hazard
+
+        // t=0
+        timeline.push({ t: 0, S: 1, S_NA: 1, n: n, d: 0 });
+
+        for (let i = 0; i < sorted.length; ) {
+            let t = sorted[i].time;
+            let d = 0; 
+            let c = 0; 
+            
+            while(i < sorted.length && Math.abs(sorted[i].time - t) < 0.1) {
+                if(sorted[i].type === 'event') d++;
+                else c++;
+                i++;
+            }
+
+            if (n > 0) {
+                // Kaplan-Meier (Product Limit)
+                S_KM = S_KM * (1 - (d / n));
+                // Nelson-Aalen (Sum of Hazards)
+                H_NA = H_NA + (d / n);
+            }
+            
+            // Convert NA Hazard to Survival Probability: S(t) = exp(-H(t))
+            let S_NA = Math.exp(-H_NA);
+
+            timeline.push({ t, S: S_KM, S_NA: S_NA, n, d });
+            n = n - d - c;
+        }
+        
+        let last = timeline[timeline.length-1];
+        timeline.push({ t: 100, S: last.S, S_NA: last.S_NA, n: 0, d: 0 });
+        
+        return timeline;
+    }
+
+    function drawChart() {
+        const data = calculateStats();
+        const w = canvas.width;
+        const h = canvas.height;
+        
+        // --- LAYOUT CONFIG ---
+        const marginL = 80; 
+        const marginB = 40;
+        const marginT = 20;
+        const graphW = w - marginL - 20;
+        const graphH = h - marginB - marginT;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // --- DRAW AXES ---
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = "12px sans-serif";
+        ctx.textBaseline = "middle"; 
+
+        // Vertical Y-Axis Line
+        ctx.beginPath();
+        ctx.strokeStyle = '#94a3b8';
+        ctx.moveTo(marginL, marginT);
+        ctx.lineTo(marginL, marginT + graphH);
+        ctx.stroke();
+
+        // Y-Axis Ticks
+        ctx.textAlign = "right"; 
+        for(let i=0; i<=4; i++) {
+            let val = i / 4; 
+            let y = marginT + graphH - (val * graphH);
+            
+            // Horizontal Grid
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)'; 
+            ctx.moveTo(marginL, y);
+            ctx.lineTo(marginL + graphW, y);
+            ctx.stroke();
+
+            // Label: "1.00", "0.75" ...
+            ctx.fillText(val.toFixed(2), marginL - 8, y); 
+        }
+
+        // Y-Axis Title (Rotated)
+        ctx.save();
+        ctx.translate(20, marginT + graphH/2); 
+        ctx.rotate(-Math.PI/2);
+        ctx.textAlign = "center";
+        ctx.font = "bold 13px sans-serif";
+        
+        if (mode === 'KM') {
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillText("Survival Probability S(t)", 0, 0);
+        } else {
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillText("Est. Survival e^(-Λ) (NA)", 0, 0);
+        }
+        ctx.restore();
+        
+        // X-Axis Line
+        ctx.beginPath();
+        ctx.strokeStyle = '#94a3b8';
+        ctx.moveTo(marginL, marginT + graphH);
+        ctx.lineTo(marginL + graphW, marginT + graphH);
+        ctx.stroke();
+        
+        // X-Axis Label
+        ctx.textAlign = "center";
+        ctx.fillStyle = '#94a3b8';
+        ctx.textBaseline = "top";
+        ctx.fillText("Time (t)", marginL + graphW/2, h - 15);
+
+        // --- DRAW CURVE ---
+        let color = mode === 'KM' ? '#3b82f6' : '#f59e0b';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+
+        let currentX = marginL;
+        // Start at 1.0 (TOP) for BOTH KM and NA
+        let currentY = marginT + graphH - (1.0 * graphH); 
+
+        ctx.moveTo(currentX, currentY);
+
+        data.forEach(pt => {
+            let nextX = marginL + (pt.t / 100) * graphW;
+            let val = mode === 'KM' ? pt.S : pt.S_NA;
+            let nextY = marginT + graphH - (val * graphH);
+
+            // Step Draw
+            ctx.lineTo(nextX, currentY); 
+            ctx.lineTo(nextX, nextY);
+
+            currentX = nextX;
+            currentY = nextY;
+        });
+
+        // Finish line
+        ctx.lineTo(marginL + graphW, currentY);
+        ctx.stroke();
+
+        // --- DRAW EVENT DOTS ---
+        data.forEach(pt => {
+            if(pt.d > 0) {
+                let x = marginL + (pt.t / 100) * graphW;
+                let val = mode === 'KM' ? pt.S : pt.S_NA;
+                let y = marginT + graphH - (val * graphH);
+                
+                ctx.fillStyle = '#f43f5e';
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI*2);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#1e293b'; 
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        });
+    }
+
+    function setMode(m) {
+        mode = m;
+        btnKM.classList.toggle('active', mode === 'KM');
+        btnNA.classList.toggle('active', mode === 'NA');
+        drawChart();
+    }
+
+    function showTooltip(e, p) {
+        tooltip.style.opacity = 1;
+        tooltip.style.left = e.clientX + 10 + 'px';
+        tooltip.style.top = e.clientY - 20 + 'px';
+        tooltip.innerHTML = `<strong>ID: ${p.id}</strong><br>Time: ${p.time.toFixed(1)}<br>Status: ${p.type}`;
+    }
+    
+    function hideTooltip() { tooltip.style.opacity = 0; }
+
+    resetData();
+
+</script>
+</body>
+</html>
