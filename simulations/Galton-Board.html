@@ -85,7 +85,7 @@
         <canvas id="board"></canvas>
     </div>
 
-    <script>
+ <script>
         const canvas = document.getElementById('board');
         const ctx = canvas.getContext('2d');
 
@@ -101,6 +101,9 @@
         let width, height, spacing, pegSize, ballSize, pegAreaHeight, binAreaHeight, hopperHeight;
         let pegs = [], balls = [], bins = [], floodInterval = null, maxStackHeight = 0; 
         let audioCtx = null, isMuted = false, lastResizeWidth = window.innerWidth;
+        
+        // Dynamic Timing variables
+        let lastTime = 0;
 
         function init() {
             const maxWidth = 550; 
@@ -121,11 +124,9 @@
             createPegs();
             if (bins.length === 0) createBins();
             
-            // This loop handles DRAWING (slows down in BG)
-            requestAnimationFrame(renderLoop);
-            
-            // This loop handles MATH (stays consistent in BG)
-            setInterval(update, 1000 / 60); 
+            // Kickstart the unified game loop
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
         }
 
         function initAudio() {
@@ -134,7 +135,7 @@
         }
 
         function playSound(type) {
-            if (isMuted || !audioCtx || document.hidden) return; // Don't play sounds if tab is hidden
+            if (isMuted || !audioCtx || document.hidden) return; 
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain);
@@ -202,7 +203,7 @@
                 btn.innerText = "🌊 Flood Gates";
                 btn.classList.remove('active');
             } else {
-                floodInterval = setInterval(spawnBall, 40); 
+                floodInterval = setInterval(spawnBall, 60); // Slowed down spawn rate slightly for visual clarity
                 btn.innerText = "🛑 Stop";
                 btn.classList.add('active');
             }
@@ -213,11 +214,30 @@
             if (floodInterval) toggleFlood();
         }
 
-        function update() {
+        // UNIFIED GAME LOOP (Handles both variable speed correction and rendering)
+        function gameLoop(timestamp) {
+            // Calculate how much time passed since the last frame
+            let dt = (timestamp - lastTime) / (1000 / 60);
+            lastTime = timestamp;
+
+            // Cap dt to avoid massive physics jumps if the browser tab freezes or stutters
+            if (dt > 2) dt = 2; 
+
+            updatePhysics(dt);
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updatePhysics(dt) {
             for (let i = balls.length - 1; i >= 0; i--) {
                 let b = balls[i];
-                b.vy += gravity; b.vx *= friction;
-                b.x += b.vx; b.y += b.vy;
+                
+                // Scale physics updates by delta time
+                b.vy += gravity * dt; 
+                b.vx *= Math.pow(friction, dt);
+                b.x += b.vx * dt; 
+                b.y += b.vy * dt;
 
                 if (b.y < hopperHeight) {
                     const funnelSlope = 1.5; const centerX = width / 2;
@@ -232,11 +252,17 @@
                     if (dist < pegSize + ballSize) {
                         const angle = Math.atan2(dy, dx);
                         const overlap = (pegSize + ballSize) - dist;
-                        b.x += Math.cos(angle) * overlap; b.y += Math.sin(angle) * overlap;
+                        
+                        b.x += Math.cos(angle) * overlap; 
+                        b.y += Math.sin(angle) * overlap;
+                        
                         b.vx *= damping; 
                         let bounceDir = Math.sign(dx) || (Math.random() > 0.5 ? 1 : -1);
-                        b.vx += (bounceDir * kickStrength) + (Math.random() - 0.5) * randomness; 
+                        
+                        // Bounce velocity added safely
+                        b.vx += ((bounceDir * kickStrength) + (Math.random() - 0.5) * randomness); 
                         b.vy *= -elasticity;
+                        
                         if (Math.random() > 0.6) playSound('hit');
                     }
                 }
@@ -253,7 +279,7 @@
             }
         }
 
-        function renderLoop() {
+        function render() {
             ctx.clearRect(0, 0, width, height);
 
             // 1. Funnel
@@ -300,8 +326,6 @@
                 ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
                 ctx.fillText(c, 5, y - 2);
             }
-
-            requestAnimationFrame(renderLoop);
         }
 
         init();
