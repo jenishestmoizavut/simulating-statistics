@@ -276,6 +276,21 @@
         }
 
         footer { margin-top: auto; padding-top: 50px; color: var(--footer-color); font-size: 0.9rem; }
+        .featured-badge {
+            position: absolute; top: 15px; right: 15px;
+            background: #ff0000; color: white;
+            font-size: 0.7rem; padding: 4px 8px; border-radius: 10px; font-weight: bold;
+            box-shadow: 0 4px 10px rgba(255, 0, 0, 0.25);
+        }
+
+    .website-btn {
+            display: inline-flex; align-items: center; gap: 10px;
+            background-color: var(--accent); color: white;
+            padding: 12px 30px; border-radius: 50px; text-decoration: none;
+            font-weight: bold; font-size: 1rem; transition: all 0.2s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+        .website-btn:hover { filter: brightness(1.1); transform: scale(1.05); }
     </style>
 </head>
 <body>
@@ -307,6 +322,14 @@
     </header>
 
     <div class="grid">
+        <a href="simulations/Galton-Board.html" class="card">
+            <div class="featured-badge">FEATURED ON YT</div>
+            <span class="tag">Statistics</span>
+            <div class="icon">📉</div>
+            <h2>The Galton Board</h2>
+            <p>Watch order emerge from chaos. Balls drop to form a perfect Bell Curve.</p>
+        </a>
+
         <a href="simulations/K-Means-Clustering.html" class="card">
             <div class="new-badge">NEW</div>
             <span class="tag">Machine Learning</span>
@@ -328,13 +351,6 @@
             <div class="icon">🎂</div>
             <h2>Birthday Paradox</h2>
             <p>Why does it only take 23 people to have a 50% chance of a shared birthday?</p>
-        </a>
-
-        <a href="simulations/Galton-Board.html" class="card">
-            <span class="tag">Statistics</span>
-            <div class="icon">📉</div>
-            <h2>The Galton Board</h2>
-            <p>Watch order emerge from chaos. Balls drop to form a perfect Bell Curve.</p>
         </a>
 
         <a href="simulations/Monty-Hall-Problem.html" class="card">
@@ -421,7 +437,6 @@
             <p>Exploring Bayes' Theorem, Poisson Processes, and more statistical magic.</p>
         </div>
     </div>
-
     <div class="creator-section">
         <div class="creator-card">
             <h3>From the Creator <span class="wave">👋</span></h3>
@@ -430,11 +445,13 @@
                 statistical concepts to life. If you have any feedback, 
                 I'd love to hear!
             </p>
-            <a href="https://www.linkedin.com/in/jenish-chaplot" target="_blank" class="linkedin-btn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+         <a href="https://jenishestmoizavut.github.io/jenish.one" target="_blank" class="website-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                 </svg>
-                Connect on LinkedIn
+                Visit My Main Page
             </a>
         </div>
     </div>
