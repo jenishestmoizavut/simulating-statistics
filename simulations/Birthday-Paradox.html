@@ -145,6 +145,10 @@
         <div class="stats">
             <span>People</span>
             <strong id="count">0</strong>
+            </div>
+            <div class="stats">
+            <span>Matches</span>
+            <strong id="matchCount" style="color: var(--match-color);">0</strong>
         </div>
         <div class="stats">
             <span>Comparisons</span>
@@ -167,6 +171,18 @@
 
     <div class="modal-overlay" id="info-modal">
         <div class="modal-card" style="text-align: left;">
+            <div style="background:#f0f2f5; padding:15px; border-radius:10px; margin:15px 0; font-family: monospace; font-size: 0.9rem; line-height: 1.6;">
+    <strong style="color:var(--accent); font-family: sans-serif;">The Math Engine</strong><br>
+    
+    <span style="color:#636e72;">// 1. Comparisons (Pairs)</span><br>
+    Pairs = n × (n - 1) / 2<br><br>
+
+    <span style="color:#636e72;">// 2. Probability of a Match</span><br>
+    P(Match) = 1 - (365! / (365ⁿ × (365 - n)!))<br><br>
+
+    <span style="color:#636e72;">// 3. Expected Matches (Mean)</span><br>
+    Mean = n × (n - 1) / 730
+</div>
             <h2 style="margin-top:0; color:var(--accent);">Why is this happening?</h2>
             <p>It feels like you need 183 people (50% of 365) to get a match, but that's wrong.</p>
             <p>You aren't comparing everyone to <em>you</em>. You are comparing <strong>everyone to everyone</strong>.</p>
@@ -433,29 +449,37 @@ function showToast(message) {
 
             document.getElementById('prob').innerText = probDisplay;
         }
- function checkMatches() {
-            const counts = {};
+function checkMatches() {
             matchedIndices = [];
+            let totalMatches = 0;
             let newMatchOccurred = false;
-            const newPersonIndex = people.length - 1;
+            const lastIndex = people.length - 1;
 
-            people.forEach((day, index) => {
-                if (counts[day] !== undefined) {
-                    matchedIndices.push(counts[day]);
-                    matchedIndices.push(index); 
-                    
-                    // Only flag as a NEW match if the person we just added caused it
-                    if (index === newPersonIndex) {
-                        newMatchOccurred = true;
+            // 1. Compare everyone to everyone to count total matches
+            for (let i = 0; i < people.length; i++) {
+                for (let j = i + 1; j < people.length; j++) {
+                    if (people[i] === people[j]) {
+                        totalMatches++; // Found a pair!
+                        
+                        // Add both people to the highlight list
+                        if (!matchedIndices.includes(i)) matchedIndices.push(i);
+                        if (!matchedIndices.includes(j)) matchedIndices.push(j);
+                        
+                        // If the newest person is part of this pair, trigger the alarm
+                        if (j === lastIndex) {
+                            newMatchOccurred = true;
+                        }
                     }
-                } else {
-                    counts[day] = index;
                 }
-            });
+            }
 
-            // UI Updates for Cards
+            // 2. Update the new UI counter
+            const matchCounter = document.getElementById('matchCount');
+            if (matchCounter) matchCounter.innerText = totalMatches;
+
+            // 3. UI Updates for Cards (Highlighting)
             const cards = document.getElementsByClassName('person-card');
-            for(let i=0; i<cards.length; i++) {
+            for(let i = 0; i < cards.length; i++) {
                 if(matchedIndices.includes(i)) cards[i].classList.add('match');
                 else cards[i].classList.remove('match');
             }
@@ -519,6 +543,7 @@ function showToast(message) {
             people = [];
             matchedIndices = [];
             document.getElementById('room').innerHTML = '';
+            document.getElementById('matchCount').innerText = '0'; // <-- ADD THIS LINE
             updateStats();
             const btn = document.getElementById('addBtn');
             btn.disabled = false;
