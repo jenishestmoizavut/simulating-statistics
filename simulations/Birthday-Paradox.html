@@ -417,10 +417,22 @@ function showToast(message) {
             // Probability Math
             let noMatch = 1;
             for (let i = 0; i < n; i++) noMatch *= (365 - i) / 365;
-            let prob = ((1 - noMatch) * 100).toFixed(2);
-            document.getElementById('prob').innerText = prob + "%";
-        }
+            
+            let probValue = (1 - noMatch) * 100;
+            let probDisplay = "";
 
+            // The exact math fix!
+            if (n >= 367) {
+                probDisplay = "100%";
+            } else if (probValue >= 99.995) {
+                // If it's technically less than 100 but would round to 100.00
+                probDisplay = ">99.99%"; 
+            } else {
+                probDisplay = probValue.toFixed(2) + "%";
+            }
+
+            document.getElementById('prob').innerText = probDisplay;
+        }
  function checkMatches() {
             const counts = {};
             matchedIndices = [];
