@@ -188,7 +188,7 @@
             <button onclick="toggleWin()" style="width:100%; background:var(--gold); color:black;">Awesome!</button>
         </div>
     </div>
-
+<div id="toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none;"></div>
     <script>
         // --- AUDIO ENGINE ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -280,7 +280,27 @@
         }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
-
+function showToast(message) {
+            const toast = document.createElement('div');
+            toast.style.background = 'var(--match-color)';
+            toast.style.color = 'white';
+            toast.style.padding = '12px 24px';
+            toast.style.borderRadius = '12px';
+            toast.style.boxShadow = '0 10px 30px rgba(255, 118, 117, 0.4)';
+            toast.style.animation = 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            toast.style.fontWeight = 'bold';
+            toast.innerHTML = message;
+            
+            document.getElementById('toast-container').appendChild(toast);
+            
+            // Fade out and remove after 3 seconds
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(20px)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
         function drawLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
@@ -401,30 +421,34 @@
             document.getElementById('prob').innerText = prob + "%";
         }
 
-        function checkMatches() {
+ function checkMatches() {
             const counts = {};
             matchedIndices = [];
-            let foundMatch = false;
+            let newMatchOccurred = false;
+            const newPersonIndex = people.length - 1;
 
             people.forEach((day, index) => {
                 if (counts[day] !== undefined) {
-                    // We found a collision!
-                    matchedIndices.push(counts[day]); // The original person
-                    matchedIndices.push(index);       // The new person
-                    foundMatch = true;
+                    matchedIndices.push(counts[day]);
+                    matchedIndices.push(index); 
+                    
+                    // Only flag as a NEW match if the person we just added caused it
+                    if (index === newPersonIndex) {
+                        newMatchOccurred = true;
+                    }
                 } else {
                     counts[day] = index;
                 }
             });
 
-            // UI Updates
+            // UI Updates for Cards
             const cards = document.getElementsByClassName('person-card');
             for(let i=0; i<cards.length; i++) {
                 if(matchedIndices.includes(i)) cards[i].classList.add('match');
                 else cards[i].classList.remove('match');
             }
 
-            return foundMatch;
+            return newMatchOccurred;
         }
 
         function addPerson() {
@@ -450,20 +474,15 @@
             updateStats();
 
             // Check Win
-            if (checkMatches()) {
-                const btn = document.getElementById('addBtn');
-                btn.innerText = "Match Found!";
-                btn.disabled = true;
-                
+            if (checkMatches()) {                
                 const count = people.length;
-                
+                const soundType = count <= 12 ? 'rare' : 'match';
+                playSound(soundType);
                 // Wait for the "Scan" animation to finish before showing popup
-                setTimeout(() => {
-                    const soundType = count <= 12 ? 'rare' : 'match';
-                    playSound(soundType);
-                    triggerWinPopup(count);
-                }, 600);
-            }
+            let msg = `🎉 Match found at ${count} people!`;
+                if (count <= 12) msg = `🦄 Super Rare Match at ${count} people!`;
+                
+                showToast(msg);
         }
 
         function removePerson() {
