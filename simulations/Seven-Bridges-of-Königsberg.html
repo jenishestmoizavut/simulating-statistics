@@ -122,7 +122,7 @@
         <canvas id="gameCanvas"></canvas>
         <div class="message-overlay" id="msgOverlay">
             <div class="message-text">TRAPPED! 🚫</div>
-            <div class="message-sub">You are stuck in <span id="stuckLoc"></span>. Every path out has already been used.</div>
+            <div class="message-sub">You are stuck on the <span id="stuckLoc"></span>. Every path out has already been used.</div>
             <button class="primary" onclick="resetGame()">Try Again</button>
         </div>
     </div>
@@ -178,11 +178,12 @@
         // Audio Context (Created on first interaction)
         let audioCtx;
 
+        // TWEAKED LABELS TO CLARIFY THE GEOGRAPHY
         const nodes = {
-            0: { x: 300, y: 80, label: "North" },
-            1: { x: 300, y: 250, label: "Island" },
-            2: { x: 300, y: 420, label: "South" },
-            3: { x: 550, y: 250, label: "East" }
+            0: { x: 300, y: 80, label: "North Bank" },
+            1: { x: 300, y: 250, label: "Central Island" },
+            2: { x: 300, y: 420, label: "South Bank" },
+            3: { x: 550, y: 250, label: "East Bank" }
         };
 
         function init() {
