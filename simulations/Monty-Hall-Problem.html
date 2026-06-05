@@ -4,128 +4,191 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monty Hall Simulator</title>
-    <link rel="icon" href="../favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #222f3e;
-            --door-color: #ff9f43;
-            --door-hover: #ffb166;
+            --bg-dark: #1e1e2f;
+            --bg-light: #2a2a40;
+            --door-front: linear-gradient(145deg, #ff9f43, #ff7f50);
+            --door-hover: linear-gradient(145deg, #ffb166, #ff8c61);
             --accent: #48dbfb;
-            --text-color: #c8d6e5;
-            --container-bg: #151b23;
+            --text-main: #f5f6fa;
+            --text-muted: #a4b0be;
+            --container-bg: rgba(42, 42, 64, 0.6);
             --success: #1dd1a1;
             --danger: #ff6b6b;
-            --info: #54a0ff;
+            --info: #5f27cd;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0; padding: 20px;
-            display: flex; flex-direction: column; align-items: center;
+            font-family: 'Poppins', sans-serif;
+            background: radial-gradient(circle at top, var(--bg-light), var(--bg-dark) 80%);
+            color: var(--text-main);
+            margin: 0; 
+            padding: 40px 20px;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
             min-height: 100vh;
         }
 
-        h1 { margin-bottom: 5px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; color: #fff; text-align: center; }
-        p.subtitle { color: #8395a7; margin-top: 0; margin-bottom: 30px; text-align: center; }
+        h1 { margin-bottom: 5px; font-weight: 700; letter-spacing: 1px; text-align: center; font-size: 2.5rem; text-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        p.subtitle { color: var(--text-muted); margin-top: 0; margin-bottom: 40px; text-align: center; font-size: 1.1rem; }
 
         /* --- DOORS --- */
         .game-container {
-            display: flex; gap: 20px; margin-bottom: 40px; perspective: 1000px; justify-content: center;
+            display: flex; gap: 30px; margin-bottom: 40px; perspective: 1000px; justify-content: center;
         }
 
         .door-wrapper {
-            position: relative; width: 100px; height: 150px; cursor: pointer;
+            position: relative; width: 110px; height: 160px; cursor: pointer;
+            transition: opacity 0.3s ease, transform 0.2s ease;
         }
+
+        .door-wrapper.dimmed { opacity: 0.4; cursor: default; }
+        .door-wrapper:not(.dimmed):hover { transform: translateY(-5px); }
 
         .door {
             width: 100%; height: 100%;
-            background-color: var(--door-color);
-            border-radius: 8px;
+            background: var(--door-front);
+            border-radius: 12px;
             position: absolute; top: 0; left: 0; z-index: 2;
-            transition: transform 0.5s ease-in-out, background-color 0.2s;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
             transform-origin: left;
             display: flex; align-items: center; justify-content: center;
-            font-size: 2rem; color: rgba(0,0,0,0.2); font-weight: bold;
-            border: 4px solid #e58e26;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            font-size: 3rem; color: rgba(255,255,255,0.9); font-weight: 700;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+            border: 2px solid rgba(255,255,255,0.2);
         }
 
-        .door-wrapper:hover .door { background-color: var(--door-hover); }
-        .door-wrapper.selected .door { border-color: var(--accent); box-shadow: 0 0 20px var(--accent); }
+        .door-wrapper:not(.dimmed):hover .door { background: var(--door-hover); }
+        
+        .door-wrapper.selected .door { 
+            border: 4px solid var(--accent); 
+            box-shadow: 0 0 25px rgba(72, 219, 251, 0.6); 
+        }
+        
         .door-wrapper.open .door { transform: rotateY(-110deg); }
 
         .prize {
             width: 100%; height: 100%;
-            background-color: #2d3436;
-            border-radius: 8px;
+            background-color: #2f3542;
+            border-radius: 12px;
             position: absolute; top: 0; left: 0; z-index: 1;
             display: flex; align-items: center; justify-content: center;
-            font-size: 3.5rem;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            font-size: 4rem;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.6);
+            border: 2px solid #57606f;
         }
 
-        /* --- CONTROLS --- */
+        /* --- CONTROLS & MESSAGING --- */
         .message-box {
-            height: 40px; margin-bottom: 20px; font-size: 1.2rem; font-weight: 600;
+            height: 50px; margin-bottom: 20px; font-size: 1.4rem; font-weight: 600;
             color: var(--accent); text-align: center;
+            background: rgba(0,0,0,0.2); padding: 10px 30px; border-radius: 30px;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(5px);
         }
 
         .controls {
-            display: flex; gap: 15px; margin-bottom: 30px; flex-wrap: wrap; justify-content: center;
+            display: flex; gap: 15px; margin-bottom: 40px; flex-wrap: wrap; justify-content: center; align-items: center;
         }
 
         button {
-            padding: 12px 25px; border-radius: 25px; border: none; font-size: 1rem; font-weight: 700;
-            cursor: pointer; transition: transform 0.1s, background 0.2s;
-            background: #576574; color: white;
+            padding: 12px 28px; border-radius: 30px; border: none; font-size: 1.1rem; font-weight: 600;
+            cursor: pointer; transition: all 0.2s; font-family: 'Poppins', sans-serif;
+            background: #57606f; color: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        button:hover { background: #6c7a89; }
-        button:active { transform: scale(0.95); }
         
-        button.choice { background-color: var(--accent); color: #222f3e; display: none; }
-        button.sim { background-color: var(--info); color: white; }
+        button:hover { background: #747d8c; transform: translateY(-2px); }
+        button:active { transform: translateY(1px); }
         
-        .icon-btn { width: 45px; height: 45px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 0 0 rgba(72, 219, 251, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(72, 219, 251, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(72, 219, 251, 0); }
+        }
+
+        button.choice { 
+            background-color: var(--accent); color: #1e1e2f; display: none; 
+            animation: pulseGlow 2s infinite;
+        }
+        button.choice:hover { background-color: #0abde3; }
+        
+        .icon-btn { width: 50px; height: 50px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; background: #2f3542; }
+        .icon-btn:hover { background: #57606f; }
 
         /* --- STATS BARS --- */
         .stats-grid {
-            background: var(--container-bg); padding: 25px; border-radius: 15px;
-            border: 1px solid #576574; width: 100%; max-width: 500px;
+            background: var(--container-bg); padding: 30px; border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1); width: 100%; max-width: 550px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
 
-        .stat-row { margin-bottom: 15px; }
-        .stat-header { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; color: #8395a7; }
-        .progress-track { background: #222f3e; height: 24px; border-radius: 12px; overflow: hidden; position: relative; }
-        .progress-fill { height: 100%; transition: width 0.5s; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; font-size: 0.8rem; font-weight: bold; color: rgba(0,0,0,0.5); }
+        .stat-row { margin-bottom: 20px; }
+        .stat-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 1rem; color: var(--text-main); font-weight: 600;}
+        .progress-track { background: rgba(0,0,0,0.4); height: 28px; border-radius: 14px; overflow: hidden; position: relative; border: 1px solid rgba(255,255,255,0.05); }
         
-        .stay-fill { background: var(--danger); width: 0%; }
-        .switch-fill { background: var(--success); width: 0%; }
+        .progress-fill { height: 100%; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; justify-content: flex-end; padding-right: 12px; font-size: 0.85rem; font-weight: 700; color: rgba(255,255,255,0.9); text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
         
-        /* 33% and 66% markers */
-        .marker { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,0.3); z-index: 10; }
+        .stay-fill { background: linear-gradient(90deg, #ff4757, #ff6b81); width: 0%; }
+        .switch-fill { background: linear-gradient(90deg, #2ed573, #7bed9f); width: 0%; }
+        
+        .marker { position: absolute; top: 0; bottom: 0; width: 3px; background: rgba(255,255,255,0.8); z-index: 10; box-shadow: 0 0 8px rgba(255,255,255,0.5);}
+
+        /* --- SIMULATION CONTROLS --- */
+        .sim-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .sim-label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        button.sim { 
+            background-color: rgba(95, 39, 205, 0.4); 
+            font-size: 0.85rem; 
+            padding: 8px 16px;
+            border-radius: 8px;
+            box-shadow: none;
+        }
+        button.sim:hover { background-color: var(--info); transform: translateY(-1px); }
 
         /* --- MODAL --- */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center;
-            z-index: 2000; backdrop-filter: blur(5px);
+            background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center;
+            z-index: 2000; backdrop-filter: blur(8px);
+            opacity: 0; transition: opacity 0.3s ease;
         }
-        .modal-overlay.active { display: flex; }
+        .modal-overlay.active { display: flex; opacity: 1; }
         .modal-card {
-            background: white; padding: 30px; border-radius: 20px; max-width: 600px; width: 90%;
-            color: #2d3436; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            background: var(--bg-light); padding: 40px; border-radius: 20px; max-width: 500px; width: 90%;
+            color: var(--text-main); box-shadow: 0 20px 50px rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1);
         }
-        .modal-card h2 { margin-top: 0; color: #222f3e; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        .modal-card p, .modal-card li { line-height: 1.6; color: #636e72; }
-        .highlight { background: #dfe6e9; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #2d3436; }
+        .modal-card h2 { margin-top: 0; color: var(--accent); border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; font-size: 1.8rem;}
+        .modal-card p, .modal-card li { line-height: 1.7; color: var(--text-muted); font-size: 1.05rem;}
+        .modal-card ul { padding-left: 20px; }
+        .modal-card li { margin-bottom: 10px; }
+        .highlight { color: #fff; font-weight: 600; }
+        
+        .close-btn { width: 100%; background: var(--accent); color: var(--bg-dark); margin-top: 20px; }
+        .close-btn:hover { background: #0abde3; }
     </style>
 </head>
 <body>
 
     <h1>Monty Hall Simulator</h1>
-    <p class="subtitle">The Math is Counter-Intuitive.</p>
+    <p class="subtitle">Trust the math. Don't trust your gut.</p>
 
     <div class="message-box" id="msg">Pick a door to start!</div>
 
@@ -146,15 +209,12 @@
 
     <div class="controls">
         <button id="btnStay" class="choice" onclick="makeDecision(false)">Stay</button>
-        <button id="btnSwitch" class="choice" onclick="makeDecision(true)">Switch!</button>
+        <button id="btnSwitch" class="choice" onclick="makeDecision(true)">Switch Door!</button>
         
-        <button id="btnReset" onclick="resetGame()" style="display:none">Play Again</button>
+        <button id="btnReset" onclick="resetGame()" style="display:none; background: var(--success); color: #1e1e2f;">Play Again</button>
         
-        <button class="sim" onclick="simulate(100)">Simulate 100x</button>
-        <button class="sim" onclick="simulate(1000)">1000x</button>
-        
-        <button class="icon-btn" onclick="toggleMute()" id="muteBtn" title="Sound">🔊</button>
-        <button class="icon-btn" onclick="toggleModal()" title="Help">?</button>
+        <button class="icon-btn" onclick="toggleMute()" id="muteBtn" title="Toggle Sound">🔊</button>
+        <button class="icon-btn" onclick="toggleModal()" title="How it works">❓</button>
     </div>
 
     <div class="stats-grid">
@@ -179,22 +239,28 @@
                 <div class="marker" style="left: 66.6%" title="Theoretical 66%"></div>
             </div>
         </div>
-        <div style="text-align: center; font-size: 0.8rem; color: #8395a7; margin-top: 10px;">
-            White lines mark the mathematical probability (33% vs 66%)
+        <div style="text-align: center; font-size: 0.85rem; color: var(--text-muted); margin-top: 15px;">
+            White lines mark the mathematical probability (33.3% vs 66.6%)
+        </div>
+
+        <!-- Moved Simulation Controls -->
+        <div class="sim-controls">
+            <span class="sim-label">Fast-forward:</span>
+            <button class="sim" onclick="simulate(100)">+100 Rounds</button>
+            <button class="sim" onclick="simulate(1000)">+1000 Rounds</button>
         </div>
     </div>
 
     <div class="modal-overlay" id="modal">
         <div class="modal-card">
             <h2>Why Switch?</h2>
-            
-            <p>It feels like a 50/50 choice, but it isn't.</p>
+            <p>It feels like a 50/50 choice, but your brain is playing tricks on you.</p>
             <ul>
-                <li><strong>Start:</strong> You have a 1/3 chance of picking the car. The other doors have a 2/3 chance.</li>
-                <li><strong>The Reveal:</strong> Monty opens a door. He <em>cannot</em> pick the car. He effectively consolidates that entire 2/3 chance into the <strong>one remaining door</strong>.</li>
+                <li><strong>The Start:</strong> You have a 1/3 chance of picking the car. The <span class="highlight">other doors have a 2/3 chance.</span></li>
+                <li><strong>The Reveal:</strong> Monty opens a door. His hands are tied—he <em>cannot</em> pick the car. He effectively consolidates that entire 2/3 chance into the <strong>one remaining door</strong>.</li>
             </ul>
-            <p>By switching, you are betting against your original (unlikely) guess.</p>
-            <button onclick="toggleModal()" style="width:100%; background: #222f3e;">Got it</button>
+            <p>By always switching, you instantly win the car every single time your first pick was wrong!</p>
+            <button class="close-btn" onclick="toggleModal()">Got it</button>
         </div>
     </div>
 
@@ -213,16 +279,14 @@
             gain.connect(audioCtx.destination);
 
             if (type === 'win') {
-                // Happy Chime
                 osc.type = 'triangle';
-                osc.frequency.setValueAtTime(523.25, now); // C
-                osc.frequency.linearRampToValueAtTime(1046.50, now + 0.1); // High C
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.linearRampToValueAtTime(1046.50, now + 0.1);
                 gain.gain.setValueAtTime(0.1, now);
                 gain.gain.linearRampToValueAtTime(0.001, now + 0.3);
                 osc.start(now);
                 osc.stop(now + 0.3);
             } else if (type === 'lose') {
-                // Sad slide
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(150, now);
                 osc.frequency.linearRampToValueAtTime(100, now + 0.4);
@@ -231,7 +295,6 @@
                 osc.start(now);
                 osc.stop(now + 0.4);
             } else if (type === 'click') {
-                // Woodblock sound
                 osc.frequency.setValueAtTime(800, now);
                 gain.gain.setValueAtTime(0.05, now);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
@@ -250,7 +313,7 @@
         let carLocation = 0;
         let pickedDoor = -1;
         let openedDoor = -1;
-        let gameState = 'PICK'; // PICK, DECIDE, REVEAL
+        let gameState = 'PICK'; 
 
         // Stats
         let stayWins = 0, stayTotal = 0;
@@ -264,8 +327,9 @@
             openedDoor = -1;
             carLocation = Math.floor(Math.random() * 3);
 
-            document.getElementById('msg').innerText = "Pick a door to start!";
-            document.getElementById('msg').style.color = "var(--accent)";
+            const msgBox = document.getElementById('msg');
+            msgBox.innerText = "Pick a door to start!";
+            msgBox.style.color = "var(--text-main)";
             
             document.getElementById('btnReset').style.display = 'none';
             document.getElementById('btnStay').style.display = 'none';
@@ -273,11 +337,10 @@
 
             for(let i=0; i<3; i++) {
                 const dw = document.getElementById(`door${i}`);
-                dw.classList.remove('open', 'selected');
+                dw.classList.remove('open', 'selected', 'dimmed');
                 dw.onclick = () => pickDoor(i);
                 
                 const prize = document.getElementById(`prize${i}`);
-                // Reset emoji to Goat/Car
                 prize.innerText = (i === carLocation) ? "🚗" : "🐐";
             }
         }
@@ -290,15 +353,16 @@
             pickedDoor = doorIndex;
             document.getElementById(`door${doorIndex}`).classList.add('selected');
             
-            // Logic: Monty must open a door that is NOT the car and NOT what you picked
             let options = [0, 1, 2].filter(d => d !== pickedDoor && d !== carLocation);
             openedDoor = options[Math.floor(Math.random() * options.length)];
 
-            // Slight delay for drama
             setTimeout(() => {
                 document.getElementById(`door${openedDoor}`).classList.add('open');
+                document.getElementById(`door${openedDoor}`).classList.add('dimmed');
+                
                 gameState = 'DECIDE';
                 document.getElementById('msg').innerText = `Monty opens Door ${openedDoor+1}. Switch or Stay?`;
+                document.getElementById('msg').style.color = "var(--accent)";
                 document.getElementById('btnStay').style.display = 'block';
                 document.getElementById('btnSwitch').style.display = 'block';
             }, 400);
@@ -307,28 +371,26 @@
         function makeDecision(didSwitch) {
             if (gameState !== 'DECIDE') return;
 
-            // Determine final door
             let finalDoor = pickedDoor;
             if (didSwitch) {
                 finalDoor = [0, 1, 2].find(d => d !== pickedDoor && d !== openedDoor);
             }
 
-            // Reveal all
             for(let i=0; i<3; i++) document.getElementById(`door${i}`).classList.add('open');
 
             const win = (finalDoor === carLocation);
+            const msgBox = document.getElementById('msg');
             
             if (win) {
-                document.getElementById('msg').innerText = didSwitch ? "SWITCHED & WON! 🚗" : "STAYED & WON! 🚗";
-                document.getElementById('msg').style.color = "#1dd1a1";
+                msgBox.innerText = didSwitch ? "SWITCHED & WON! 🚗" : "STAYED & WON! 🚗";
+                msgBox.style.color = "var(--success)";
                 playSound('win');
             } else {
-                document.getElementById('msg').innerText = "GOT THE GOAT 🐐";
-                document.getElementById('msg').style.color = "#ff6b6b";
+                msgBox.innerText = "GOT THE GOAT 🐐";
+                msgBox.style.color = "var(--danger)";
                 playSound('lose');
             }
 
-            // Track stats
             if (didSwitch) {
                 switchTotal++;
                 if (win) switchWins++;
@@ -344,20 +406,15 @@
             gameState = 'REVEAL';
         }
 
-        // --- BULK SIMULATION ---
         function simulate(runs) {
-            // Run logic purely in JS variables for speed
-            let sWins = 0; // Switch wins
-            let kWins = 0; // Keep/Stay wins
+            let sWins = 0; 
+            let kWins = 0; 
             
             for(let i=0; i<runs; i++) {
                 const car = Math.floor(Math.random() * 3);
                 const pick = Math.floor(Math.random() * 3);
                 
-                // If I STAY, I only win if I picked the car initially
                 if (pick === car) kWins++;
-                
-                // If I SWITCH, I win if I picked a GOAT initially (because Monty removes the other goat, forcing me to the car)
                 else sWins++;
             }
 
@@ -367,28 +424,28 @@
             switchTotal += runs;
             
             updateStatsUI();
-            resetGame(); // Reset UI state so it doesn't look stuck
-            document.getElementById('msg').innerText = `Simulated ${runs} rounds!`;
+            resetGame();
+            const msgBox = document.getElementById('msg');
+            msgBox.innerText = `Simulated ${runs} rounds!`;
+            msgBox.style.color = "var(--accent)";
         }
 
         function updateStatsUI() {
             const stayPct = stayTotal === 0 ? 0 : ((stayWins/stayTotal)*100).toFixed(1);
             const switchPct = switchTotal === 0 ? 0 : ((switchWins/switchTotal)*100).toFixed(1);
 
-            // Update Text
             document.getElementById('stayLabel').innerText = `${stayWins}/${stayTotal} (${stayPct}%)`;
             document.getElementById('switchLabel').innerText = `${switchWins}/${switchTotal} (${switchPct}%)`;
             
-            // Update Bars
             document.getElementById('stayBar').style.width = stayPct + "%";
             document.getElementById('switchBar').style.width = switchPct + "%";
         }
 
         function toggleModal() {
-            document.getElementById('modal').classList.toggle('active');
+            const modal = document.getElementById('modal');
+            modal.classList.toggle('active');
         }
 
-        // Init
         init();
     </script>
 </body>
