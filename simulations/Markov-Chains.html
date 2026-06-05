@@ -4,445 +4,408 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Markov Chain Simulator</title>
-    <link rel="icon" href="../favicon.ico">
     <style>
         :root {
-            --bg-color: #0f172a;       /* Deep Navy */
-            --card-bg: #1e293b;        /* Slate Blue */
-            --text-color: #e2e8f0;     /* Off-white */
-            --text-muted: #94a3b8;
-            --accent: #38bdf8;         /* Cyan */
-            --accent-glow: rgba(56, 189, 248, 0.5);
-            --border: rgba(255,255,255,0.1);
+            --bg-base: #0f172a;       /* Slate 900 */
+            --bg-surface: #1e293b;    /* Slate 800 */
+            --bg-elevated: #334155;   /* Slate 700 */
+            --text-main: #f8fafc;     /* Slate 50 */
+            --text-muted: #94a3b8;    /* Slate 400 */
+            --accent: #38bdf8;        /* Sky 400 */
+            --accent-glow: rgba(56, 189, 248, 0.4);
+            --danger: #ef4444;        /* Red 500 */
+            --success: #22c55e;       /* Green 500 */
+            --border: #475569;        /* Slate 600 */
         }
 
+        * { box-sizing: border-box; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
             margin: 0; padding: 20px;
             display: flex; flex-direction: column; align-items: center;
             min-height: 100vh;
-            overflow-x: hidden; /* Prevent horizontal scroll */
+            overflow-x: hidden;
         }
 
-        h1 { margin: 0 0 5px 0; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; color: white; }
-        p.subtitle { margin-top: 0; margin-bottom: 30px; color: var(--text-muted); font-size: 0.9rem; }
+        h1 { margin: 0 0 5px 0; font-weight: 400; letter-spacing: 1px; color: white; }
+        p.subtitle { margin-top: 0; margin-bottom: 20px; color: var(--text-muted); font-size: 0.95rem; }
 
-        /* --- RESPONSIVE LAYOUT GRID --- */
-        .layout-grid {
+        /* --- LAYOUT --- */
+        .layout-container {
             display: grid;
-            grid-template-columns: 1fr; /* Default: Stacked */
+            grid-template-columns: 1fr;
             gap: 20px;
-            width: 100%; max-width: 1000px;
-            margin-bottom: 80px; /* Space for bottom bar */
+            width: 100%; max-width: 1100px;
+            margin-bottom: 100px;
         }
-        
-        /* Desktop: Side-by-side */
-        @media(min-width: 800px) {
-            .layout-grid { 
-                grid-template-columns: 2fr 1fr; 
-                height: 500px; /* Fixed height for desktop to keep it contained */
-            } 
+        @media(min-width: 850px) {
+            .layout-container { grid-template-columns: 2fr 1fr; height: 550px; }
         }
 
-        /* --- THE DIAGRAM (Left Side) --- */
-        .diagram-card {
-            background: var(--card-bg);
+        .card {
+            background: var(--bg-surface);
             border: 1px solid var(--border);
-            border-radius: 20px;
-            min-height: 350px; /* Ensure space on mobile */
-            height: 100%;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             position: relative;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-            overflow: hidden; /* Clip arrows that go too far */
         }
 
-        /* SVG Arrows */
-        .svg-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 0;
-        }
-        path {
-            fill: none; 
-            stroke: #475569; /* Dark Grey Lines */
-            stroke-width: 2; 
-            transition: stroke 0.3s;
-        }
+        /* --- DIAGRAM VIEW --- */
+        .diagram-view { min-height: 400px; height: 100%; overflow: hidden; }
+        .svg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+        
+        path { fill: none; stroke: var(--border); stroke-width: 2.5; transition: stroke 0.2s; }
         path.active-path {
-            stroke: var(--accent); 
-            stroke-width: 3; 
-            filter: drop-shadow(0 0 5px var(--accent));
-            animation: dash 0.5s linear;
+            stroke: var(--accent); stroke-width: 4;
+            filter: drop-shadow(0 0 6px var(--accent));
+            animation: dash 0.4s linear;
         }
 
-        /* Circular Nodes */
         .state-node {
             position: absolute;
-            width: 70px; height: 70px; /* Slightly smaller for better fit */
-            background: #0f172a;
-            border: 2px solid #475569;
+            width: 75px; height: 75px;
+            background: var(--bg-base);
+            border: 2px solid var(--border);
             border-radius: 50%;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             transform: translate(-50%, -50%);
             z-index: 10;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
-
         .state-node.active {
             border-color: var(--accent);
-            box-shadow: 0 0 20px var(--accent-glow);
-            transform: translate(-50%, -50%) scale(1.1);
-            background: #1e293b;
+            box-shadow: 0 0 25px var(--accent-glow);
+            transform: translate(-50%, -50%) scale(1.15);
+            background: var(--bg-surface);
         }
-
-        .state-icon { font-size: 1.5rem; margin-bottom: 2px; }
-        .state-label { font-size: 0.7rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; }
+        .state-icon { font-size: 1.8rem; margin-bottom: 2px; }
+        .state-label { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
         .state-node.active .state-label { color: white; }
 
-        /* --- STATS PANEL (Right Side) --- */
-        .stats-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 25px;
-            display: flex; flex-direction: column;
-            gap: 15px;
-            overflow-y: auto; /* Scroll if list gets long */
-        }
-
-        .main-status {
-            text-align: center; margin-bottom: 10px;
-            padding-bottom: 15px; border-bottom: 1px solid var(--border);
-        }
-        .big-icon { font-size: 3rem; animation: bounce 1s infinite alternate; display: inline-block; }
-        .step-count { font-family: monospace; color: var(--text-muted); font-size: 0.9rem; margin-top: 5px; }
-
-        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-5px); } }
-
-        /* Bars */
-        .bar-group { width: 100%; }
-        .bar-header { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 5px; font-weight: bold; }
-        .track { width: 100%; height: 8px; background: rgba(0,0,0,0.3); border-radius: 4px; position: relative; overflow: hidden; }
-        .fill { height: 100%; border-radius: 4px; transition: width 0.2s; }
+        /* --- STATS PANEL --- */
+        .stats-panel { padding: 25px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
         
-        .marker {
+        .main-status { text-align: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .big-icon { font-size: 3.5rem; display: inline-block; transition: transform 0.1s; }
+        .step-counter { font-family: monospace; color: var(--text-muted); font-size: 1.1rem; margin-top: 10px; }
+        .step-counter span { color: white; font-weight: bold; }
+
+        .bar-container { width: 100%; margin-bottom: 15px; }
+        .bar-header { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px; font-weight: 600; }
+        .track { width: 100%; height: 10px; background: var(--bg-base); border-radius: 5px; position: relative; overflow: hidden; }
+        .fill { height: 100%; border-radius: 5px; transition: width 0.3s ease-out; }
+        .target-marker {
             position: absolute; top: -2px; bottom: -2px; width: 2px; 
-            background: white; z-index: 5; box-shadow: 0 0 5px white;
+            background: white; z-index: 5; box-shadow: 0 0 4px white;
+        }
+        .target-label { font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; text-align: right; font-family: monospace; }
+
+        /* --- CONTROL BAR --- */
+        .control-bar {
+            position: fixed; bottom: 25px;
+            background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(12px);
+            padding: 12px 20px; border-radius: 100px;
+            border: 1px solid var(--border);
+            display: flex; gap: 15px; align-items: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+            z-index: 100; flex-wrap: wrap; justify-content: center;
         }
 
-        /* --- CONTROLS BAR (Bottom) --- */
-        .controls-bar {
-            position: fixed; bottom: 20px;
-            background: rgba(15, 23, 42, 0.9);
-            backdrop-filter: blur(10px);
-            padding: 10px 15px;
-            border-radius: 50px;
+        select, input[type="text"], input[type="number"] {
+            background: var(--bg-base); color: white;
             border: 1px solid var(--border);
-            display: flex; gap: 10px; align-items: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            z-index: 100;
-            flex-wrap: wrap; /* Wrap on tiny screens */
-            justify-content: center;
+            padding: 8px 12px; border-radius: 8px;
+            font-family: inherit; font-size: 0.9rem;
         }
-
-        /* FIXED SELECT DROPDOWN */
-        select {
-            appearance: none; /* Remove default arrow */
-            background-color: var(--bg-color); /* Dark Background */
-            color: white; 
-            border: 1px solid var(--border);
-            padding: 8px 30px 8px 12px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            /* Custom Arrow */
-            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2338bdf8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-            background-repeat: no-repeat;
-            background-position: right 10px top 50%;
-            background-size: 10px auto;
+        select { cursor: pointer; padding-right: 30px; appearance: none; 
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394a3b8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat; background-position: right 10px top 50%; background-size: 10px auto;
         }
-        select:focus { outline: 2px solid var(--accent); }
-        option { background-color: var(--bg-color); color: white; }
+        select:focus, input:focus { outline: 2px solid var(--accent); border-color: transparent; }
 
         button {
-            background: transparent; border: 1px solid var(--border); color: var(--text-muted); 
-            cursor: pointer; padding: 8px 12px; border-radius: 8px; font-weight: 600;
+            background: var(--bg-elevated); color: white; border: none;
+            cursor: pointer; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.9rem;
             transition: all 0.2s;
         }
-        button:hover { background: rgba(255,255,255,0.1); color: white; }
-        
-        button.primary {
-            background: var(--accent); color: #0f172a; border: none; padding: 8px 24px; border-radius: 20px;
-        }
-        button.primary:hover { transform: scale(1.05); background: #7dd3fc; }
+        button:hover { background: var(--border); }
+        button.primary { background: var(--accent); color: var(--bg-base); border-radius: 20px; padding: 8px 24px; }
+        button.primary:hover { background: #7dd3fc; transform: translateY(-1px); }
 
-        /* Slider */
-        .speed-control { display: flex; align-items: center; gap: 8px; }
-        input[type=range] { width: 60px; accent-color: var(--accent); }
-        .speed-label { font-size: 0.65rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; }
+        .control-group { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .control-label { font-size: 0.65rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+        input[type=range] { width: 80px; accent-color: var(--accent); cursor: pointer; }
 
-        /* --- MODAL --- */
+        /* --- MODAL (CUSTOM MATRIX) --- */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 2000;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+            display: none; align-items: center; justify-content: center; z-index: 2000;
         }
         .modal-overlay.active { display: flex; }
         .modal-card {
-            background: var(--card-bg); padding: 30px; border-radius: 20px;
-            max-width: 500px; width: 90%; color: white; border: 1px solid var(--border);
-        }
-        textarea {
-            width: 100%; height: 100px; background: #0f172a; border: 1px solid #475569; color: white;
-            padding: 10px; border-radius: 8px; font-family: monospace; margin-bottom: 10px; box-sizing: border-box;
-        }
-        input[type=text] {
-            width: 100%; background: #0f172a; border: 1px solid #475569; color: white;
-            padding: 8px; border-radius: 8px; margin-bottom: 20px; box-sizing: border-box;
+            background: var(--bg-surface); padding: 30px; border-radius: 20px;
+            max-width: 600px; width: 95%; border: 1px solid var(--border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
 
+        .matrix-grid { background: var(--bg-base); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .matrix-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .matrix-row:last-child { margin-bottom: 0; }
+        .matrix-row input[type=number] { width: 70px; text-align: center; font-family: monospace; }
+        
+        .row-sum { font-size: 0.85rem; font-family: monospace; min-width: 60px; text-align: right; font-weight: bold; }
+        .sum-error { color: var(--danger); }
+        .sum-ok { color: var(--success); }
+
+        .flex-between { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
-    <h1>Markov Chain</h1>
-    <p class="subtitle">Visualizing Stochastic Processes</p>
+    <h1>Markov Systems</h1>
+    <p class="subtitle">Stochastic Matrix Visualization & Stationary Distributions</p>
 
-    <div class="layout-grid">
-        
-        <div class="diagram-card" id="diagram">
+    <div class="layout-container">
+        <div class="card diagram-view" id="diagram">
             <svg class="svg-layer" id="svgLayer">
                 <defs>
-                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="28" refY="3.5" orient="auto">
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="26" refY="3.5" orient="auto">
                         <polygon points="0 0, 10 3.5, 0 7" fill="#475569" />
                     </marker>
-                    <marker id="arrowhead-active" markerWidth="10" markerHeight="7" refX="28" refY="3.5" orient="auto">
+                    <marker id="arrowhead-active" markerWidth="10" markerHeight="7" refX="26" refY="3.5" orient="auto">
                         <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8" />
                     </marker>
                 </defs>
             </svg>
-            </div>
-
-        <div class="stats-card">
-            <div class="main-status">
-                <div class="big-icon" id="mainIcon">☀️</div>
-                <div class="step-count">Steps: <span id="stepEl">0</span></div>
-            </div>
-
-            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">
-                <strong>Goal:</strong> Match the white lines (Stationary Distribution).
-            </div>
-
-            <div id="barsContainer">
-                </div>
         </div>
 
+        <div class="card stats-panel">
+            <div class="main-status">
+                <div class="big-icon" id="mainIcon">⚡</div>
+                <div class="step-counter">Iterations: <span id="stepEl">0</span></div>
+            </div>
+            
+            <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:5px;">
+                <strong>Empirical vs. Stationary Distribution (π)</strong>
+            </div>
+            <div id="barsContainer"></div>
+        </div>
     </div>
 
-    <div class="controls-bar">
-        <select id="presetSelect" onchange="loadPreset()">
-            <option value="weather">Weather (2)</option>
-            <option value="brand">Brand (2)</option>
-            <option value="life">Dev Life (3)</option>
-            <option value="custom">Custom...</option>
-        </select>
+    <div class="control-bar">
+        <div class="control-group">
+            <span class="control-label">System</span>
+            <select id="presetSelect" onchange="loadPreset()">
+                <option value="weather">Weather (2 States)</option>
+                <option value="brand">Brand Loyalty (2 States)</option>
+                <option value="work">Work Cycle (3 States)</option>
+                <option value="custom">⚙️ Custom Matrix...</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <span class="control-label">Start State</span>
+            <select id="startStateSelect" onchange="setStartState()"></select>
+        </div>
+
+        <div style="width: 1px; height: 30px; background: var(--border); margin: 0 5px;"></div>
 
         <button onclick="manualStep()">+1 Step</button>
         <button id="btnStart" class="primary" onclick="toggleSim()">Run</button>
-        <button onclick="resetSim()" title="Reset">↺</button>
+        <button onclick="resetSim()" title="Reset to Step 0">↺</button>
         
-        <div class="speed-control">
-            <div style="display:flex; flex-direction:column; align-items:center;">
-                <span class="speed-label">Speed</span>
-                <input type="range" id="speedRange" min="1" max="100" value="10">
-            </div>
+        <div class="control-group" style="margin-left: 5px;">
+            <span class="control-label">Speed</span>
+            <input type="range" id="speedRange" min="1" max="100" value="15">
         </div>
         
-        <button onclick="toggleMute()" id="muteBtn" style="opacity:0.6; padding:8px;">🔊</button>
+        <button onclick="toggleMute()" id="muteBtn" style="background:transparent; font-size:1.2rem; padding: 4px;">🔊</button>
     </div>
 
     <div class="modal-overlay" id="customModal">
         <div class="modal-card">
-            <h2 style="margin-top:0">Custom Matrix</h2>
-            <p style="font-size:0.9rem; color:#94a3b8">Enter a Transition Matrix (JSON format). Rows must sum to 1.0.</p>
+            <h2 style="margin-top:0; color:white;">Custom Transition Matrix</h2>
             
-            <textarea id="matrixInput">[
-  [0.5, 0.25, 0.25], 
-  [0.25, 0.5, 0.25], 
-  [0.25, 0.25, 0.5]
-]</textarea>
+            <div class="flex-between">
+                <div>
+                    <label style="font-size:0.9rem; color:var(--text-muted); margin-right: 10px;">Dimensions:</label>
+                    <select id="stateCount" onchange="buildMatrixUI()">
+                        <option value="2">2 × 2</option>
+                        <option value="3" selected>3 × 3</option>
+                        <option value="4">4 × 4</option>
+                        <option value="5">5 × 5</option>
+                    </select>
+                </div>
+                <button onclick="balanceMatrix()" style="background: var(--bg-elevated);">⚖️ Auto-Balance Rows</button>
+            </div>
+
+            <div id="matrixInputContainer" class="matrix-grid"></div>
             
-            <p style="font-size:0.9rem; color:#94a3b8; margin-bottom:5px;">State Labels:</p>
-            <input type="text" id="labelsInput" value="State A, State B, State C">
+            <label style="font-size:0.9rem; color:var(--text-muted); display:block; margin-bottom:8px;">State Labels (Comma Separated):</label>
+            <input type="text" id="labelsInput" style="width:100%; margin-bottom: 25px;">
             
-            <div style="display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="document.getElementById('customModal').classList.remove('active')">Cancel</button>
-                <button class="primary" onclick="applyCustom()">Load Simulation</button>
+            <div class="flex-between" style="margin-bottom:0;">
+                <button onclick="closeModal()" style="background:transparent; border:1px solid var(--border);">Cancel</button>
+                <button class="primary" onclick="applyCustom()">Initialize System</button>
             </div>
         </div>
     </div>
 
     <script>
-        // --- PRESETS ---
+        // --- DATA PRESETS ---
         const presets = {
             weather: {
-                labels: ["Sunny", "Rainy"],
-                icons: ["☀️", "🌧️"],
-                colors: ["#f59e0b", "#3b82f6"],
-                matrix: [[0.7, 0.3], [0.4, 0.6]],
-                stationary: [57.1, 42.9] 
+                labels: ["Sunny", "Rainy"], icons: ["☀️", "🌧️"], colors: ["#f59e0b", "#3b82f6"],
+                matrix: [[0.8, 0.2], [0.3, 0.7]]
             },
             brand: {
-                labels: ["Coke", "Pepsi"],
-                icons: ["🥤", "🔵"],
-                colors: ["#ef4444", "#3b82f6"],
-                matrix: [[0.9, 0.1], [0.1, 0.9]],
-                stationary: [50.0, 50.0]
+                labels: ["Brand A", "Brand B"], icons: ["🔴", "🔵"], colors: ["#ef4444", "#3b82f6"],
+                matrix: [[0.9, 0.1], [0.15, 0.85]]
             },
-            life: {
-                labels: ["Eat", "Sleep", "Code"],
-                icons: ["🍔", "💤", "💻"],
-                colors: ["#f97316", "#a855f7", "#22c55e"],
-                matrix: [
-                    [0.1, 0.4, 0.5], 
-                    [0.1, 0.8, 0.1], 
-                    [0.3, 0.2, 0.5]
-                ],
-                stationary: [14.0, 60.0, 26.0] 
+            work: {
+                labels: ["Focus", "Meeting", "Break"], icons: ["💻", "🗣️", "☕"], colors: ["#22c55e", "#a855f7", "#f97316"],
+                matrix: [[0.6, 0.3, 0.1], [0.1, 0.7, 0.2], [0.4, 0.1, 0.5]]
             }
         };
 
-        // --- STATE ---
+        // --- CORE STATE ---
         let config = null;
         let currentState = 0;
         let counts = [];
         let totalSteps = 0;
         let isRunning = false;
         let animFrame;
-
+        
         // --- AUDIO ---
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        const audioCtx = new AudioContext();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         let isMuted = false;
 
         function playSound(idx) {
             if (isMuted || audioCtx.state === 'suspended') return;
             const speed = parseInt(document.getElementById('speedRange').value);
-            if(speed > 40) return; // Too fast for audio
-
+            if(speed > 40) return; // Cut audio at high speeds
+            
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
+            osc.connect(gain); gain.connect(audioCtx.destination);
             
-            // Pentatonic Scale
             const freqs = [261.63, 293.66, 329.63, 392.00, 440.00]; 
             osc.frequency.value = freqs[idx % freqs.length];
-            
             osc.type = 'sine';
-            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
             
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
         }
 
-        // --- SETUP ---
+        // --- MATH ENGINE ---
+        function multiplyMatrix(a, b) {
+            const m = new Array(a.length);
+            for (let r = 0; r < a.length; ++r) {
+                m[r] = new Array(b[0].length).fill(0);
+                for (let c = 0; c < b[0].length; ++c) {
+                    for (let i = 0; i < a[0].length; ++i) {
+                        m[r][c] += a[r][i] * b[i][c];
+                    }
+                }
+            }
+            return m;
+        }
+
+        // Calculate Stationary Distribution via P^50
+        function calculateStationary(matrix) {
+            let p = matrix;
+            for(let i = 0; i < 50; i++) p = multiplyMatrix(p, matrix);
+            return p[0].map(val => Number((val * 100).toFixed(1)));
+        }
+
+        // --- INITIALIZATION ---
         function loadPreset() {
             const key = document.getElementById('presetSelect').value;
             if(key === 'custom') {
                 document.getElementById('customModal').classList.add('active');
+                buildMatrixUI();
                 return;
             }
-            init(presets[key]);
-        }
-
-        function applyCustom() {
-            try {
-                const mat = JSON.parse(document.getElementById('matrixInput').value);
-                const labels = document.getElementById('labelsInput').value.split(',').map(s=>s.trim());
-                if(!Array.isArray(mat)) throw new Error("Invalid Matrix");
-
-                const cfg = {
-                    labels: labels,
-                    icons: labels.map((_,i)=> String.fromCharCode(65+i)), // A, B, C...
-                    colors: labels.map((_,i) => `hsl(${i * 60 + 200}, 80%, 60%)`),
-                    matrix: mat,
-                    stationary: [] 
-                };
-                document.getElementById('customModal').classList.remove('active');
-                init(cfg);
-            } catch(e) {
-                alert("Invalid JSON: " + e.message);
-            }
+            const data = presets[key];
+            data.stationary = calculateStationary(data.matrix);
+            init(data);
         }
 
         function init(cfg) {
             config = cfg;
-            currentState = 0;
             totalSteps = 0;
             counts = new Array(cfg.matrix.length).fill(0);
-            document.getElementById('mainIcon').innerText = cfg.icons[0];
+            
+            // Populate Start State Dropdown
+            const startSelect = document.getElementById('startStateSelect');
+            startSelect.innerHTML = '';
+            cfg.labels.forEach((lbl, i) => {
+                const opt = document.createElement('option');
+                opt.value = i; opt.innerText = lbl;
+                startSelect.appendChild(opt);
+            });
+            
+            currentState = parseInt(startSelect.value) || 0;
+            document.getElementById('mainIcon').innerText = config.icons[currentState];
             
             renderDiagram();
             renderStats();
             updateUI();
-            resetSim();
+            resetSim(); // Ensures everything is at 0
         }
 
+        function setStartState() {
+            if(totalSteps > 0) resetSim(); // Force reset if changing start state mid-run
+            currentState = parseInt(document.getElementById('startStateSelect').value);
+            document.getElementById('mainIcon').innerText = config.icons[currentState];
+            updateUI();
+        }
+
+        // --- VISUAL RENDERING ---
         function renderDiagram() {
             const container = document.getElementById('diagram');
             const svg = document.getElementById('svgLayer');
             
-            // Clear nodes (keep svg)
-            Array.from(container.children).forEach(c => {
-                if(c.id !== 'svgLayer') container.removeChild(c);
-            });
-            
-            // Reset SVG Arrows
-            while (svg.children.length > 1) { // Keep defs
-                svg.removeChild(svg.lastChild);
-            }
+            // Clean up old nodes but keep SVG defs
+            Array.from(container.children).forEach(c => { if(c.id !== 'svgLayer') container.removeChild(c); });
+            while (svg.children.length > 1) svg.removeChild(svg.lastChild);
 
             const w = container.clientWidth;
             const h = container.clientHeight;
             const count = config.matrix.length;
-            
-            // Layout Logic: Circular
             const positions = [];
             
-            // Adaptive Radius: Smaller on mobile, bigger on desktop
+            // Dynamic Radius based on screen size and node count
             const minDim = Math.min(w, h);
-            const r = count === 2 ? minDim * 0.25 : minDim * 0.3;
-            const centerOffset = count === 2 ? Math.PI : -Math.PI/2;
+            const r = count === 2 ? minDim * 0.25 : minDim * 0.32;
+            const offset = count === 2 ? Math.PI : -Math.PI/2;
 
+            // Plot Nodes
             for(let i=0; i<count; i++) {
-                const angle = (i/count)*Math.PI*2 + centerOffset;
-                positions.push({
-                    x: (w/2) + Math.cos(angle)*r,
-                    y: (h/2) + Math.sin(angle)*r
-                });
-            }
-
-            // Create Nodes
-            config.labels.forEach((lbl, i) => {
+                const angle = (i/count)*Math.PI*2 + offset;
+                positions.push({ x: (w/2) + Math.cos(angle)*r, y: (h/2) + Math.sin(angle)*r });
+                
                 const node = document.createElement('div');
                 node.className = 'state-node';
                 node.id = `node-${i}`;
                 node.style.left = positions[i].x + 'px';
                 node.style.top = positions[i].y + 'px';
-                node.innerHTML = `<div class="state-icon">${config.icons[i]}</div><div class="state-label">${lbl}</div>`;
+                node.innerHTML = `<div class="state-icon">${config.icons[i]}</div><div class="state-label">${config.labels[i]}</div>`;
                 container.appendChild(node);
-            });
+            }
 
-            // Draw Paths
+            // Plot Edges (Wait a tick for DOM layout)
             setTimeout(() => {
                 for(let i=0; i<count; i++) {
                     for(let j=0; j<count; j++) {
-                        if(config.matrix[i][j] > 0) {
-                            drawArrow(i, j, positions);
-                        }
+                        if(config.matrix[i][j] > 0) drawArrow(i, j, positions);
                     }
                 }
             }, 50);
@@ -454,32 +417,24 @@
             path.id = `path-${from}-${to}`;
             path.setAttribute("marker-end", "url(#arrowhead)");
             
-            const p1 = positions[from];
-            const p2 = positions[to];
+            const p1 = positions[from]; const p2 = positions[to];
             let d = "";
 
             if(from === to) {
-                // Loop
-                const nx = p1.x - 35; 
-                const ny = p1.y - 35;
-                d = `M ${p1.x} ${p1.y-35} C ${p1.x-40} ${p1.y-80}, ${p1.x+40} ${p1.y-80}, ${p1.x} ${p1.y-35}`;
+                // Loop representation
+                d = `M ${p1.x} ${p1.y-38} C ${p1.x-45} ${p1.y-90}, ${p1.x+45} ${p1.y-90}, ${p1.x} ${p1.y-38}`;
             } else {
-                // Curved Line
-                const mx = (p1.x + p2.x)/2;
-                const my = (p1.y + p2.y)/2;
+                // Curved arrows for bi-directional clarity
+                const mx = (p1.x + p2.x)/2; const my = (p1.y + p2.y)/2;
+                let curveOffset = 35;
+                if(config.matrix.length === 2 && from === 1) curveOffset = -35;
                 
-                let offset = 30;
-                if(config.matrix.length === 2 && from === 1) offset = -30;
-                
-                const dx = p2.x - p1.x;
-                const dy = p2.y - p1.y;
+                const dx = p2.x - p1.x; const dy = p2.y - p1.y;
                 const dist = Math.sqrt(dx*dx + dy*dy);
-                const normX = -dy / dist;
-                const normY = dx / dist;
+                const normX = -dy / dist; const normY = dx / dist;
 
-                const cx = mx + (normX * offset);
-                const cy = my + (normY * offset);
-
+                const cx = mx + (normX * curveOffset);
+                const cy = my + (normY * curveOffset);
                 d = `M ${p1.x} ${p1.y} Q ${cx} ${cy} ${p2.x} ${p2.y}`;
             }
             path.setAttribute("d", d);
@@ -491,40 +446,36 @@
             container.innerHTML = '';
 
             config.labels.forEach((lbl, i) => {
+                const targetPi = config.stationary[i];
                 const div = document.createElement('div');
-                div.className = 'bar-group';
-                
-                const markerHtml = config.stationary && config.stationary[i] 
-                    ? `<div class="marker" style="left: ${config.stationary[i]}%"></div>` 
-                    : '';
-
+                div.className = 'bar-container';
                 div.innerHTML = `
                     <div class="bar-header">
                         <span style="color:${config.colors[i]}">${lbl}</span>
-                        <span id="pct-${i}">0%</span>
+                        <span id="pct-${i}">0.0%</span>
                     </div>
                     <div class="track">
                         <div class="fill" id="bar-${i}" style="background: ${config.colors[i]}; width: 0%"></div>
-                        ${markerHtml}
+                        <div class="target-marker" style="left: ${targetPi}%"></div>
                     </div>
+                    <div class="target-label">π = ${targetPi}%</div>
                 `;
                 container.appendChild(div);
             });
         }
 
-        // --- SIMULATION ---
+        // --- SIMULATION LOGIC ---
         function step() {
             const row = config.matrix[currentState];
             const r = Math.random();
-            let sum = 0; 
-            let next = 0;
+            let sum = 0, next = 0;
             
             for(let i=0; i<row.length; i++) {
                 sum += row[i];
                 if(r < sum) { next = i; break; }
             }
 
-            // Visuals
+            // Visual Arrow Flash
             const path = document.getElementById(`path-${currentState}-${next}`);
             if(path) {
                 path.setAttribute("marker-end", "url(#arrowhead-active)");
@@ -532,7 +483,7 @@
                 setTimeout(()=> {
                     path.classList.remove('active-path');
                     path.setAttribute("marker-end", "url(#arrowhead)");
-                }, 400);
+                }, 300);
             }
 
             currentState = next;
@@ -541,29 +492,26 @@
             
             playSound(currentState);
             updateUI();
+            
+            // Pop icon effect
+            const icon = document.getElementById('mainIcon');
+            icon.style.transform = 'scale(1.2)';
+            setTimeout(() => icon.style.transform = 'scale(1)', 100);
         }
 
         function updateUI() {
             document.querySelectorAll('.state-node').forEach(b => b.classList.remove('active'));
-            document.getElementById(`node-${currentState}`).classList.add('active');
+            const activeNode = document.getElementById(`node-${currentState}`);
+            if(activeNode) activeNode.classList.add('active');
+            
             document.getElementById('mainIcon').innerText = config.icons[currentState];
             document.getElementById('stepEl').innerText = totalSteps.toLocaleString();
             
             counts.forEach((c, i) => {
-                const pct = totalSteps===0 ? 0 : (c/totalSteps * 100).toFixed(1);
-                document.getElementById(`pct-${i}`).innerText = pct + "%";
+                const pct = totalSteps === 0 ? 0 : (c/totalSteps * 100);
+                document.getElementById(`pct-${i}`).innerText = pct.toFixed(1) + "%";
                 document.getElementById(`bar-${i}`).style.width = pct + "%";
             });
-        }
-
-        function resetSim() {
-            isRunning = false;
-            cancelAnimationFrame(animFrame);
-            document.getElementById('btnStart').innerText = "Run";
-            currentState = 0;
-            totalSteps = 0;
-            counts = new Array(config.matrix.length).fill(0);
-            updateUI();
         }
 
         function toggleSim() {
@@ -571,10 +519,12 @@
             const btn = document.getElementById('btnStart');
             if(isRunning) {
                 btn.innerText = "Pause";
+                btn.style.background = "var(--danger)";
                 if(audioCtx.state === 'suspended') audioCtx.resume();
                 loop();
             } else {
                 btn.innerText = "Run";
+                btn.style.background = "var(--accent)";
                 cancelAnimationFrame(animFrame);
             }
         }
@@ -585,17 +535,127 @@
             step();
         }
 
+        function resetSim() {
+            isRunning = false;
+            cancelAnimationFrame(animFrame);
+            const btn = document.getElementById('btnStart');
+            btn.innerText = "Run"; btn.style.background = "var(--accent)";
+            
+            // Respect the selected start state on reset
+            currentState = parseInt(document.getElementById('startStateSelect').value) || 0;
+            totalSteps = 0;
+            counts = new Array(config.matrix.length).fill(0);
+            
+            // Re-render to clear SVG active classes quickly
+            renderDiagram();
+            updateUI();
+        }
+
         function loop() {
             if(!isRunning) return;
             const speed = parseInt(document.getElementById('speedRange').value);
-            let steps = 1;
-            if(speed > 50) steps = Math.floor(Math.pow(speed-40, 1.6));
+            
+            let stepsPerFrame = 1;
+            if(speed > 50) stepsPerFrame = Math.floor(Math.pow(speed-40, 1.5));
 
-            for(let i=0; i<steps; i++) step();
+            for(let i=0; i<stepsPerFrame; i++) step();
 
-            let delay = speed < 40 ? (40-speed)*10 : 0;
+            let delay = speed < 40 ? (40-speed)*12 : 0;
             if(delay > 0) setTimeout(() => animFrame = requestAnimationFrame(loop), delay);
             else animFrame = requestAnimationFrame(loop);
+        }
+
+        // --- CUSTOM MATRIX BUILDER ---
+        function buildMatrixUI() {
+            const container = document.getElementById('matrixInputContainer');
+            const count = parseInt(document.getElementById('stateCount').value);
+            container.innerHTML = '';
+
+            const defaultLabels = Array.from({length: count}, (_, i) => `State ${String.fromCharCode(65+i)}`).join(', ');
+            document.getElementById('labelsInput').value = defaultLabels;
+
+            for(let r = 0; r < count; r++) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'matrix-row';
+                rowDiv.innerHTML = `<span style="color:var(--text-muted); font-size:0.8rem; width:50px;">From ${String.fromCharCode(65+r)}:</span>`;
+
+                for(let c = 0; c < count; c++) {
+                    const input = document.createElement('input');
+                    input.type = 'number'; input.step = '0.01'; input.min = '0'; input.max = '1';
+                    input.value = (1 / count).toFixed(2);
+                    input.id = `mat-${r}-${c}`;
+                    input.oninput = () => checkRowSum(r, count);
+                    rowDiv.appendChild(input);
+                }
+
+                const sumSpan = document.createElement('span');
+                sumSpan.id = `sum-${r}`; sumSpan.className = 'row-sum sum-ok'; sumSpan.innerText = 'Σ=1.00';
+                rowDiv.appendChild(sumSpan);
+                container.appendChild(rowDiv);
+            }
+        }
+
+        function checkRowSum(r, count) {
+            let sum = 0;
+            for(let c = 0; c < count; c++) sum += parseFloat(document.getElementById(`mat-${r}-${c}`).value) || 0;
+            
+            const span = document.getElementById(`sum-${r}`);
+            span.innerText = `Σ=${sum.toFixed(2)}`;
+            
+            if(Math.abs(sum - 1.0) > 0.01) { span.className = 'row-sum sum-error'; return false; }
+            else { span.className = 'row-sum sum-ok'; return true; }
+        }
+
+        function balanceMatrix() {
+            const count = parseInt(document.getElementById('stateCount').value);
+            for(let r = 0; r < count; r++) {
+                let sum = 0;
+                for(let c = 0; c < count; c++) sum += parseFloat(document.getElementById(`mat-${r}-${c}`).value) || 0;
+                if(sum > 0) {
+                    for(let c = 0; c < count; c++) {
+                        const el = document.getElementById(`mat-${r}-${c}`);
+                        el.value = ((parseFloat(el.value) || 0) / sum).toFixed(2);
+                    }
+                }
+                checkRowSum(r, count);
+            }
+        }
+
+        function applyCustom() {
+            const count = parseInt(document.getElementById('stateCount').value);
+            let mat = [];
+            
+            for(let r = 0; r < count; r++) {
+                if(!checkRowSum(r, count)) return alert(`Row ${String.fromCharCode(65+r)} does not sum to 1.0.`);
+                let row = [];
+                for(let c = 0; c < count; c++) row.push(parseFloat(document.getElementById(`mat-${r}-${c}`).value) || 0);
+                mat.push(row);
+            }
+
+            let rawLabels = document.getElementById('labelsInput').value.split(',').map(s=>s.trim());
+            const labels = Array.from({length: count}, (_, i) => rawLabels[i] || `State ${String.fromCharCode(65+i)}`);
+            
+            const cfg = {
+                labels: labels,
+                icons: labels.map(l => l.charAt(0).toUpperCase()),
+                colors: labels.map((_,i) => `hsl(${i * (360/count)}, 80%, 60%)`),
+                matrix: mat,
+                stationary: calculateStationary(mat)
+            };
+
+            closeModal();
+            // Add custom to dropdown if not there
+            const select = document.getElementById('presetSelect');
+            select.value = 'custom';
+            init(cfg);
+        }
+
+        function closeModal() {
+            document.getElementById('customModal').classList.remove('active');
+            // Revert select if cancelled
+            if(config && config.labels.length !== parseInt(document.getElementById('stateCount').value)) {
+                document.getElementById('presetSelect').value = 'weather';
+            }
         }
 
         function toggleMute() { 
@@ -603,9 +663,9 @@
             document.getElementById('muteBtn').style.opacity = isMuted ? "0.3" : "1";
         }
 
-        // Init
-        window.onload = () => loadPreset();
-        window.onresize = () => renderDiagram(); 
+        // Init bindings
+        window.onload = loadPreset;
+        window.onresize = () => { if(config) renderDiagram(); };
     </script>
 </body>
 </html>
