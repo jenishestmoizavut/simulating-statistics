@@ -511,6 +511,8 @@
 <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
   const firebaseConfig = {
   apiKey: "AIzaSyDgkPIFlgsZfkt1oWaHZPPUNPotRzGHROs",
@@ -534,6 +536,28 @@
                 console.warn("Analytics blocked (likely by an adblocker)", e);
             }
         };
+
+        // --- SHARED FIRESTORE / ANONYMOUS AUTH ---
+        // Exposed globally so any simulation page on this site (loaded as a
+        // module script) can read/write leaderboards without re-initializing
+        // Firebase. Auth is anonymous — no Google sign-in, no account UI.
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        window.firebaseDb = db;
+        window.firebaseHelpers = { doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp };
+
+        window.firebaseReady = new Promise((resolve) => {
+            onAuthStateChanged(auth, (account) => {
+                if (account) {
+                    window.firebaseUid = account.uid;
+                    resolve(account.uid);
+                }
+            });
+            signInAnonymously(auth).catch((e) => {
+                console.warn("Anonymous sign-in failed:", e);
+                resolve(null);
+            });
+        });
 
         // --- AUTOMATIC EVENT TRACKING ---
 
@@ -561,5 +585,3 @@
     </script>
 </body>
 </html>
-
-
