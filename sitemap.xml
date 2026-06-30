@@ -1,9 +1,99 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://jenishestmoizavut.github.io/simulating-statistics/</loc>
-    <lastmod>2026-06-28</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>1.0</priority>
-  </url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>1.0</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/Galton-Board.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/Birthday-Paradox.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/Seven-Bridges-of-K%C3%B6nigsberg.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/K-Means-Clustering.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/survival-functions.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/Monty-Hall-Problem.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/Chaos-Game-(Fractals).html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/pi-by-pins.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/Game-of-Life-by-John-Conway.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/CoinToss.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/Dice-that-don't-gamble-(I hope).html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/Random-Walk-(Diffusion).html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/Simple-Random-Walk.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/Markov-Chains.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
+<url>
+<loc>https://jenishestmoizavut.github.io/simulating-statistics/simulations/guess_the_day.html</loc>
+<lastmod>2026-06-30</lastmod>
+<changefreq>monthly</changefreq>
+<priority>0.8</priority>
+</url>
 </urlset>
