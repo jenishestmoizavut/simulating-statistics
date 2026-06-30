@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guess the Day — Calendar Arithmetic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0f1320;
+    --ink-2:#171c2e;
+    --ink-3:#1f2538;
+    --parchment:#f3e9d2;
+    --brass:#d6a85c;
+    --brass-dim:#9c7c45;
+    --cyan:#7fd8e0;
+    --cyan-dim:#3f6e72;
+    --good:#7fbf8f;
+    --bad:#d97373;
+    --text-main:#e9e6db;
+    --text-dim:#9aa0b4;
+    --border:rgba(214,168,92,0.22);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(127,216,224,0.07), transparent 50%),
+      radial-gradient(ellipse at 100% 110%, rgba(214,168,92,0.08), transparent 55%),
+      var(--ink);
+    color:var(--text-main);
+    font-family:'Inter',sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:48px 20px 80px;
+  }
+
+  /* faint star/dot field for the almanac-night feel */
+  body::before{
+    content:"";
+    position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, rgba(243,233,210,0.25) 50%, transparent 51%),
+      radial-gradient(1px 1px at 80% 12%, rgba(243,233,210,0.18) 50%, transparent 51%),
+      radial-gradient(1px 1px at 60% 70%, rgba(243,233,210,0.15) 50%, transparent 51%),
+      radial-gradient(1px 1px at 30% 85%, rgba(243,233,210,0.2) 50%, transparent 51%),
+      radial-gradient(1px 1px at 92% 60%, rgba(243,233,210,0.18) 50%, transparent 51%);
+  }
+
+  .wrap{ position:relative; z-index:1; width:100%; max-width:680px; }
+
+  .eyebrow{
+    text-align:center; font-family:'JetBrains Mono',monospace; font-size:0.75rem;
+    letter-spacing:0.22em; text-transform:uppercase; color:var(--brass-dim); margin-bottom:10px;
+  }
+  h1{
+    font-family:'Spectral',serif; font-weight:700; font-size:2.5rem; text-align:center;
+    margin:0 0 6px; letter-spacing:0.01em;
+  }
+  p.subtitle{
+    text-align:center; color:var(--text-dim); margin:0 0 36px; font-size:1.02rem; line-height:1.5;
+  }
+  p.subtitle strong{ color:var(--parchment); font-weight:600; }
+
+  /* ---------- SCORE BAR ---------- */
+  .scorebar{
+    display:flex; justify-content:center; gap:28px; margin-bottom:30px;
+    font-family:'JetBrains Mono',monospace; font-size:0.85rem; color:var(--text-dim);
+  }
+  .scorebar .stat{ text-align:center; }
+  .scorebar .stat b{ display:block; font-size:1.3rem; color:var(--parchment); font-weight:700; }
+  .scorebar .stat.streak b{ color:var(--brass); }
+
+  /* ---------- MAIN CARD ---------- */
+  .card{
+    background:linear-gradient(180deg, var(--ink-2), var(--ink-3));
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:34px 30px;
+    box-shadow:0 30px 60px -25px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03);
+    margin-bottom:22px;
+  }
+
+  .riddle{ text-align:center; margin-bottom:28px; }
+  .riddle .anchor{
+    font-family:'JetBrains Mono',monospace; font-size:0.82rem; color:var(--text-dim);
+    margin-bottom:10px;
+  }
+  .riddle .anchor b{ color:var(--cyan); font-weight:600; }
+  .riddle .question{
+    font-family:'Spectral',serif; font-size:1.55rem; font-weight:600; line-height:1.45;
+  }
+  .riddle .target-date{ color:var(--brass); }
+  .riddle .meta{
+    font-family:'JetBrains Mono',monospace; font-size:0.78rem; color:var(--text-dim); margin-top:10px;
+  }
+
+  .days-grid{
+    display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-bottom:6px;
+  }
+  .day-btn{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:0.85rem;
+    padding:14px 4px; border-radius:10px; border:1px solid var(--border);
+    background:rgba(127,216,224,0.04); color:var(--text-main);
+    cursor:pointer; transition:transform .15s ease, background .15s ease, border-color .15s ease;
+  }
+  .day-btn:hover:not(:disabled){ background:rgba(127,216,224,0.12); border-color:var(--cyan-dim); transform:translateY(-2px); }
+  .day-btn:disabled{ cursor:default; }
+  .day-btn.chosen{ border-color:var(--cyan); background:rgba(127,216,224,0.18); }
+  .day-btn.correct{ border-color:var(--good); background:rgba(127,191,143,0.22); color:#cdeed6; }
+  .day-btn.wrong{ border-color:var(--bad); background:rgba(217,115,115,0.18); color:#f3cccc; }
+
+  .feedback{
+    min-height:28px; text-align:center; font-family:'JetBrains Mono',monospace;
+    font-size:0.9rem; margin:16px 0 4px; font-weight:500;
+  }
+  .feedback.correct{ color:var(--good); }
+  .feedback.wrong{ color:var(--bad); }
+
+  .actions{ display:flex; justify-content:center; gap:12px; margin-top:18px; }
+  button.next-btn{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:0.92rem;
+    padding:11px 26px; border-radius:30px; border:1px solid var(--brass);
+    background:rgba(214,168,92,0.12); color:var(--brass);
+    cursor:pointer; transition:all .15s ease; opacity:0; pointer-events:none;
+  }
+  button.next-btn.show{ opacity:1; pointer-events:auto; }
+  button.next-btn:hover{ background:rgba(214,168,92,0.22); }
+
+  /* ---------- LEDGER ---------- */
+  .ledger{
+    background:rgba(0,0,0,0.22);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:0;
+    max-height:0;
+    overflow:hidden;
+    opacity:0;
+    transition:max-height .5s ease, opacity .5s ease, padding .5s ease, margin .5s ease;
+  }
+  .ledger.open{ max-height:600px; opacity:1; padding:22px 26px; margin-bottom:6px; }
+  .ledger h3{
+    font-family:'Spectral',serif; font-size:1.05rem; margin:0 0 14px; color:var(--parchment);
+    font-weight:600;
+  }
+  .ledger-line{
+    font-family:'JetBrains Mono',monospace; font-size:0.88rem; color:var(--text-dim);
+    line-height:2; opacity:0; transform:translateX(-6px);
+    transition:opacity .35s ease, transform .35s ease;
+  }
+  .ledger-line.show{ opacity:1; transform:translateX(0); }
+  .ledger-line .lbl{ color:var(--text-dim); }
+  .ledger-line b{ color:var(--brass); font-weight:700; }
+  .ledger-line.result b{ color:var(--good); }
+  .ledger-note{
+    margin-top:14px; font-size:0.78rem; color:var(--text-dim); font-style:italic;
+    border-top:1px dashed var(--border); padding-top:12px; font-family:'Inter',sans-serif;
+  }
+
+  .toggle-row{ display:flex; justify-content:center; margin-top:14px; }
+  .toggle-row button{
+    background:none; border:none; color:var(--cyan-dim); font-family:'JetBrains Mono',monospace;
+    font-size:0.78rem; cursor:pointer; text-decoration:underline; text-underline-offset:3px;
+    opacity:0; pointer-events:none; transition:opacity .3s ease;
+  }
+  .toggle-row button.show{ opacity:1; pointer-events:auto; color:var(--cyan); }
+
+  /* ---------- HOW IT WORKS (always-available reference) ---------- */
+  details.howto{
+    background:var(--ink-2); border:1px solid var(--border); border-radius:14px;
+    padding:18px 22px; font-size:0.92rem; line-height:1.6; color:var(--text-dim);
+  }
+  details.howto summary{
+    cursor:pointer; font-family:'Spectral',serif; font-size:1.08rem; font-weight:600;
+    color:var(--parchment); list-style:none;
+  }
+  details.howto summary::-webkit-details-marker{ display:none; }
+  details.howto summary::before{ content:"▸ "; color:var(--brass); }
+  details.howto[open] summary::before{ content:"▾ "; }
+  details.howto p{ margin:12px 0 0; }
+  details.howto code{
+    font-family:'JetBrains Mono',monospace; background:rgba(214,168,92,0.1);
+    padding:1px 6px; border-radius:5px; color:var(--brass);
+  }
+
+  /* ---------- LEADERBOARD ---------- */
+  .leaderboard-card{
+    background:linear-gradient(180deg, var(--ink-2), var(--ink-3));
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:26px 28px;
+    margin-bottom:22px;
+  }
+  .lb-head{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;
+  }
+  .lb-head h3{
+    font-family:'Spectral',serif; font-size:1.2rem; font-weight:600; margin:0; color:var(--parchment);
+  }
+  .lb-status{ font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:var(--text-dim); }
+  .lb-status.live{ color:var(--good); }
+  .lb-you{
+    font-family:'JetBrains Mono',monospace; font-size:0.8rem; color:var(--text-dim);
+    background:none; border:none; cursor:pointer; text-decoration:underline; text-underline-offset:3px;
+  }
+  .lb-you:hover{ color:var(--cyan); }
+  .lb-list{ display:flex; flex-direction:column; gap:6px; }
+  .lb-row{
+    display:grid; grid-template-columns:28px 1fr auto auto; align-items:center; gap:10px;
+    padding:9px 10px; border-radius:9px; font-size:0.88rem;
+  }
+  .lb-row.me{ background:rgba(127,216,224,0.1); border:1px solid var(--cyan-dim); }
+  .lb-rank{ font-family:'JetBrains Mono',monospace; color:var(--brass-dim); font-weight:700; }
+  .lb-name{ color:var(--text-main); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lb-streak{ font-family:'JetBrains Mono',monospace; color:var(--brass); font-size:0.82rem; }
+  .lb-score{ font-family:'JetBrains Mono',monospace; color:var(--text-dim); font-size:0.78rem; }
+  .lb-empty{ color:var(--text-dim); font-size:0.88rem; text-align:center; padding:14px 0; }
+
+  /* ---------- NAME MODAL ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(8,9,16,0.78); backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; z-index:50;
+    opacity:0; pointer-events:none; transition:opacity .25s ease;
+  }
+  .modal-overlay.show{ opacity:1; pointer-events:auto; }
+  .modal-box{
+    background:linear-gradient(180deg, var(--ink-2), var(--ink-3));
+    border:1px solid var(--border); border-radius:18px; padding:30px 28px;
+    width:100%; max-width:360px; box-shadow:0 30px 60px -20px rgba(0,0,0,0.7);
+    transform:translateY(8px); transition:transform .25s ease;
+  }
+  .modal-overlay.show .modal-box{ transform:translateY(0); }
+  .modal-box h3{
+    font-family:'Spectral',serif; font-size:1.25rem; margin:0 0 8px; color:var(--parchment);
+  }
+  .modal-box p{ color:var(--text-dim); font-size:0.88rem; margin:0 0 18px; line-height:1.5; }
+  .modal-box input{
+    width:100%; padding:11px 14px; border-radius:10px; border:1px solid var(--border);
+    background:rgba(0,0,0,0.25); color:var(--text-main); font-family:'Inter',sans-serif;
+    font-size:0.95rem; margin-bottom:14px;
+  }
+  .modal-box input:focus{ outline:none; border-color:var(--cyan); }
+  .modal-actions{ display:flex; gap:10px; justify-content:flex-end; }
+  .modal-actions button{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:0.88rem;
+    padding:9px 20px; border-radius:24px; border:1px solid var(--brass); cursor:pointer;
+    background:rgba(214,168,92,0.12); color:var(--brass); transition:background .15s ease;
+  }
+  .modal-actions button:hover{ background:rgba(214,168,92,0.22); }
+  .modal-actions button.ghost{
+    border-color:var(--border); background:none; color:var(--text-dim);
+  }
+
+  @media (max-width:480px){
+    h1{ font-size:1.9rem; }
+    .riddle .question{ font-size:1.25rem; }
+    .day-btn{ font-size:0.72rem; padding:11px 2px; }
+    .card{ padding:26px 18px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Calendar Arithmetic Trainer</div>
+  <h1>Guess the Day</h1>
+  <p class="subtitle">Anchor on today, count the elapsed days, fold in the leap years, and land on the weekday — <strong>before</strong> the answer reveals itself.</p>
+
+  <div class="scorebar">
+    <div class="stat"><b id="statScore">0</b>score</div>
+    <div class="stat"><b id="statTotal">0</b>played</div>
+    <div class="stat streak"><b id="statStreak">0</b>streak</div>
+    <div class="stat"><b id="statBest">0</b>best streak</div>
+  </div>
+
+  <div class="card">
+    <div class="riddle">
+      <div class="anchor">Today is <b id="anchorDate">—</b></div>
+      <div class="question">What day of the week falls on <span class="target-date" id="targetDate">—</span>?</div>
+      <div class="meta" id="metaLine"></div>
+    </div>
+
+    <div class="days-grid" id="daysGrid"></div>
+
+    <div class="feedback" id="feedback"></div>
+
+    <div class="ledger" id="ledger">
+      <h3>The working</h3>
+      <div id="ledgerLines"></div>
+      <div class="ledger-note" id="ledgerNote"></div>
+    </div>
+
+    <div class="toggle-row"><button id="ledgerToggle">show the working</button></div>
+
+    <div class="actions"><button class="next-btn" id="nextBtn">Next date →</button></div>
+  </div>
+
+  <div class="leaderboard-card">
+    <div class="lb-head">
+      <h3>Leaderboard — best streak</h3>
+      <span class="lb-status" id="lbStatus">connecting…</span>
+    </div>
+    <div class="lb-list" id="lbList"><div class="lb-empty">Loading…</div></div>
+    <div style="text-align:center;margin-top:14px;">
+      <button class="lb-you" id="changeNameBtn">playing as — / change name</button>
+    </div>
+  </div>
+
+  <details class="howto">
+    <summary>How the algorithm works</summary>
+    <p>Pick an anchor you know — today's date and weekday. Count the days between today and the target date. The weekday only depends on that count <code>mod 7</code>, since the week repeats every 7 days.</p>
+    <p>When the target is exactly <b>N years ahead on the same month and day</b>, the day-count shortcut is: <code>days ≈ N × 365 + leap days passed</code>. A quick mental estimate for leap days is <code>floor(N / 4)</code> — then take that whole total <code>mod 7</code> to get the weekday offset from today.</p>
+    <p>That quick estimate is occasionally off by one, because the Gregorian calendar skips leap years on century marks not divisible by 400 (1900 wasn't a leap year, 2000 was). For a date tens of years out this rarely bites — but this tool always counts the exact leap days for the real answer, while showing you the quick mental-math estimate alongside it.</p>
+    <p>When the target is an arbitrary number of days ahead, there's no leap-year step needed at all — just take the day count straight <code>mod 7</code>.</p>
+  </details>
+</div>
+
+<div class="modal-overlay" id="nameModal">
+  <div class="modal-box">
+    <h3>What should we call you?</h3>
+    <p>This name appears next to your score on the leaderboard. No account, no email — just a name.</p>
+    <input type="text" id="nameInput" maxlength="20" placeholder="e.g. Jenish">
+    <div class="modal-actions">
+      <button class="ghost" id="nameSkipBtn">Play without a name</button>
+      <button id="nameSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const DAY_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  const daysGrid = document.getElementById('daysGrid');
+  const anchorDateEl = document.getElementById('anchorDate');
+  const targetDateEl = document.getElementById('targetDate');
+  const metaLine = document.getElementById('metaLine');
+  const feedbackEl = document.getElementById('feedback');
+  const ledger = document.getElementById('ledger');
+  const ledgerLines = document.getElementById('ledgerLines');
+  const ledgerNote = document.getElementById('ledgerNote');
+  const ledgerToggle = document.getElementById('ledgerToggle');
+  const nextBtn = document.getElementById('nextBtn');
+
+  const statScore = document.getElementById('statScore');
+  const statTotal = document.getElementById('statTotal');
+  const statStreak = document.getElementById('statStreak');
+  const statBest = document.getElementById('statBest');
+
+  const lbStatus = document.getElementById('lbStatus');
+  const lbList = document.getElementById('lbList');
+  const changeNameBtn = document.getElementById('changeNameBtn');
+  const nameModal = document.getElementById('nameModal');
+  const nameInput = document.getElementById('nameInput');
+  const nameSaveBtn = document.getElementById('nameSaveBtn');
+  const nameSkipBtn = document.getElementById('nameSkipBtn');
+
+  let score = 0, total = 0, streak = 0, best = 0;
+  let answered = false;
+  let current = null; // {today, target, mode, ...}
+
+  function isLeapYear(y){ return (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0); }
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+  }
+
+  function countLeapDaysBetween(d1, d2){
+    // counts Feb-29 occurrences strictly after d1 and on/before d2
+    let count = 0;
+    for(let y = d1.getFullYear(); y <= d2.getFullYear(); y++){
+      if(isLeapYear(y)){
+        const feb29 = new Date(y,1,29);
+        if(feb29 > d1 && feb29 <= d2) count++;
+      }
+    }
+    return count;
+  }
+
+  function yearsInWindow(d1, d2){
+    // years whose 'leap slot' (the moment just before Mar 1) falls strictly after d1 and on/before d2
+    const arr = [];
+    for(let y = d1.getFullYear(); y <= d2.getFullYear(); y++){
+      const mar1 = new Date(y, 2, 1);
+      if(mar1 > d1 && mar1 <= d2) arr.push(y);
+    }
+    return arr;
+  }
+
+  function fmtFull(d){
+    return `${DAY_NAMES[d.getDay()]}, ${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+  }
+  function fmtTarget(d){
+    return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+  }
+  function elapsedDays(d1, d2){
+    return Math.round((d2.setHours(0,0,0,0) - d1.setHours(0,0,0,0)) / 86400000);
+  }
+
+  function buildGrid(){
+    daysGrid.innerHTML = '';
+    DAY_SHORT.forEach((label, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'day-btn';
+      btn.textContent = label;
+      btn.dataset.idx = idx;
+      btn.addEventListener('click', () => handleGuess(idx, btn));
+      daysGrid.appendChild(btn);
+    });
+  }
+
+  function newRound(){
+    answered = false;
+    feedbackEl.textContent = '';
+    feedbackEl.className = 'feedback';
+    ledger.classList.remove('open');
+    ledgerToggle.classList.remove('show');
+    ledgerToggle.textContent = 'show the working';
+    nextBtn.classList.remove('show');
+    ledgerLines.innerHTML = '';
+    ledgerNote.textContent = '';
+
+    const today = new Date(); today.setHours(0,0,0,0);
+    const mode = Math.random() < 0.5 ? 'years' : 'days';
+    let target, N;
+
+    if(mode === 'years'){
+      N = 10 + Math.floor(Math.random() * 290); // 10 - 299 years ahead
+      target = new Date(today.getFullYear() + N, today.getMonth(), today.getDate());
+    } else {
+      N = 30 + Math.floor(Math.random() * 870); // 30 - 899 days ahead
+      target = new Date(today);
+      target.setDate(target.getDate() + N);
+    }
+
+    const totalDays = elapsedDays(new Date(today), new Date(target));
+    const offset = ((totalDays % 7) + 7) % 7;
+    const correctIdx = (today.getDay() + offset) % 7;
+
+    current = { today, target, mode, N, totalDays, offset, correctIdx };
+
+    anchorDateEl.textContent = fmtFull(today);
+    targetDateEl.textContent = fmtTarget(target);
+    metaLine.textContent = mode === 'years'
+      ? `${N} years ahead, same month & day`
+      : `${N} days ahead`;
+
+    Array.from(daysGrid.children).forEach(btn => {
+      btn.disabled = false;
+      btn.className = 'day-btn';
+    });
+
+    buildLedgerContent();
+  }
+
+  function buildLedgerContent(){
+    const { today, target, mode, N, totalDays, offset, correctIdx } = current;
+    const lines = [];
+
+    if(mode === 'years'){
+      const exactLeap = countLeapDaysBetween(new Date(today), new Date(target));
+      const approxLeap = Math.floor(N / 4);
+      const windowYears = yearsInWindow(new Date(today), new Date(target));
+      const mult4Years = windowYears.filter(y => y % 4 === 0);
+      const nonLeapCenturies = mult4Years.filter(y => y % 100 === 0 && y % 400 !== 0);
+
+      lines.push(`<span class="lbl">Years ahead:</span> N = <b>${N}</b>`);
+      lines.push(`<span class="lbl">Off-days from common years:</span> 365 = 364 + 1, so each plain year shifts the weekday by <b>1</b> &rarr; ${N} off-days`);
+      lines.push(`<span class="lbl">Years divisible by 4 in this stretch:</span> <b>${mult4Years.length}</b> &nbsp;<span style="opacity:0.65;">(quick floor(${N}/4) guess: ${approxLeap}${mult4Years.length !== approxLeap ? ' — off by ' + Math.abs(mult4Years.length - approxLeap) + ", since today isn't aligned to a 4-year boundary" : ', spot on'})</span>`);
+
+      if(nonLeapCenturies.length){
+        lines.push(`<span class="lbl">Century-rule subtraction:</span> ${nonLeapCenturies.join(', ')} ${nonLeapCenturies.length > 1 ? "aren't" : "isn't"} actually leap years (÷100 but not ÷400) &rarr; ${mult4Years.length} &minus; ${nonLeapCenturies.length} = <b>${exactLeap}</b>`);
+      } else {
+        lines.push(`<span class="lbl">Century-rule subtraction:</span> no non-leap century year in this stretch &rarr; stays <b>${exactLeap}</b>`);
+      }
+
+      lines.push(`<span class="lbl">Total off-days:</span> ${N} + ${exactLeap} = <b>${N + exactLeap}</b>`);
+      lines.push(`<span class="lbl">Offset from today:</span> ${N + exactLeap} mod 7 = <b>${offset}</b>`);
+      lines.push(`<span class="lbl result">Today is ${DAY_NAMES[today.getDay()]}, so target = </span><b class="result-day">${DAY_NAMES[correctIdx]}</b>`);
+
+      if(nonLeapCenturies.length){
+        ledgerNote.textContent = `The naive floor(N/4) mental shortcut undercounts here — it's only a rough guess for how many leap years you've crossed. The real count comes from how many years divisible by 4 actually fall in the stretch, minus any century years (like ${nonLeapCenturies.join(', ')}) that break the every-4-years pattern.`;
+      } else {
+        ledgerNote.textContent = `No century exception in this stretch, so it's just: count the years divisible by 4, no further correction needed.`;
+      }
+    } else {
+      lines.push(`<span class="lbl">Days ahead:</span> N = <b>${N}</b>`);
+      lines.push(`<span class="lbl">No leap-year step needed for a plain day count.</span>`);
+      lines.push(`<span class="lbl">Offset from today:</span> ${N} mod 7 = <b>${offset}</b>`);
+      lines.push(`<span class="lbl result">Today is ${DAY_NAMES[today.getDay()]}, so target = </span><b class="result-day">${DAY_NAMES[correctIdx]}</b>`);
+      ledgerNote.textContent = `Tip: ${N} = ${Math.floor(N/7)} full weeks + ${N % 7} extra day${N % 7 === 1 ? '' : 's'} — the weeks don't matter, only the remainder does.`;
+    }
+
+    ledgerLines.innerHTML = lines.map(l => `<div class="ledger-line result">${l}</div>`).join('');
+  }
+
+  function revealLedger(animate){
+    const lines = ledgerLines.querySelectorAll('.ledger-line');
+    lines.forEach(l => l.classList.remove('show'));
+    ledger.classList.add('open');
+    if(animate){
+      lines.forEach((l, i) => setTimeout(() => l.classList.add('show'), 120 * i));
+    } else {
+      lines.forEach(l => l.classList.add('show'));
+    }
+  }
+
+  function handleGuess(idx, btn){
+    if(answered) return;
+    answered = true;
+    total++;
+    const isCorrect = idx === current.correctIdx;
+    if(isCorrect){ score++; streak++; best = Math.max(best, streak); }
+    else { streak = 0; }
+
+    Array.from(daysGrid.children).forEach(b => {
+      b.disabled = true;
+      const bIdx = Number(b.dataset.idx);
+      if(bIdx === current.correctIdx) b.classList.add('correct');
+      if(bIdx === idx && !isCorrect) b.classList.add('wrong');
+      if(bIdx === idx) b.classList.add('chosen');
+    });
+
+    feedbackEl.textContent = isCorrect
+      ? `Correct — it's ${DAY_NAMES[current.correctIdx]}.`
+      : `Not quite — it's ${DAY_NAMES[current.correctIdx]}, not ${DAY_NAMES[idx]}.`;
+    feedbackEl.classList.add(isCorrect ? 'correct' : 'wrong');
+
+    updateStats();
+    ledgerToggle.classList.add('show');
+    nextBtn.classList.add('show');
+    revealLedger(true);
+  }
+
+  function updateStats(){
+    statScore.textContent = score;
+    statTotal.textContent = total;
+    statStreak.textContent = streak;
+    statBest.textContent = best;
+    syncToCloud();
+  }
+
+  ledgerToggle.addEventListener('click', () => {
+    if(ledger.classList.contains('open')){
+      ledger.classList.remove('open');
+      ledgerToggle.textContent = 'show the working';
+    } else {
+      revealLedger(false);
+      ledgerToggle.textContent = 'hide the working';
+    }
+  });
+
+  nextBtn.addEventListener('click', newRound);
+
+  // ================= LEADERBOARD (Firebase) =================
+  const NAME_KEY = 'guess_day_player_name';
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDgkPIFlgsZfkt1oWaHZPPUNPotRzGHROs",
+    authDomain: "simulating-statistics.firebaseapp.com",
+    projectId: "simulating-statistics",
+    storageBucket: "simulating-statistics.firebasestorage.app",
+    messagingSenderId: "1083477766541",
+    appId: "1:1083477766541:web:b85824bcc33820396f0dc4"
+  };
+  let firebase = null;
+  let uid = null;
+  let leaderboardUnsub = null;
+  let playerName = localStorage.getItem(NAME_KEY) || '';
+
+  function refreshChangeNameLabel(){
+    changeNameBtn.textContent = playerName
+      ? `playing as ${playerName} — change name`
+      : 'playing as Guest — set a name';
+  }
+
+  function openNameModal(){
+    nameInput.value = playerName;
+    nameModal.classList.add('show');
+    setTimeout(() => nameInput.focus(), 50);
+  }
+  function closeNameModal(){ nameModal.classList.remove('show'); }
+
+  nameSaveBtn.addEventListener('click', () => {
+    const v = nameInput.value.trim().slice(0, 20);
+    playerName = v || 'Guest';
+    localStorage.setItem(NAME_KEY, playerName);
+    refreshChangeNameLabel();
+    closeNameModal();
+    syncToCloud();
+  });
+  nameSkipBtn.addEventListener('click', () => {
+    if(!playerName) playerName = 'Guest';
+    localStorage.setItem(NAME_KEY, playerName);
+    refreshChangeNameLabel();
+    closeNameModal();
+    syncToCloud();
+  });
+  nameInput.addEventListener('keydown', e => { if(e.key === 'Enter') nameSaveBtn.click(); });
+  changeNameBtn.addEventListener('click', openNameModal);
+
+  async function syncToCloud(){
+    if(!firebase || !uid) return;
+    try{
+      await firebase.setDoc(
+        firebase.doc(firebase.db, 'leaderboards', 'guess-the-day', 'entries', uid),
+        {
+          name: playerName || 'Guest',
+          score, total, streak, bestStreak: best,
+          updatedAt: firebase.serverTimestamp()
+        },
+        { merge: true }
+      );
+    } catch(err){ console.warn('Leaderboard sync failed:', err); }
+  }
+
+  function renderLeaderboard(rows){
+    if(!rows.length){
+      lbList.innerHTML = '<div class="lb-empty">No scores yet. Be the first!</div>';
+      return;
+    }
+    lbList.innerHTML = rows.map((e, i) => {
+      const mine = e.__uid === uid;
+      return `<div class="lb-row${mine ? ' me' : ''}">
+        <span class="lb-rank">${i + 1}.</span>
+        <span class="lb-name">${escapeHtml(e.name || 'Guest')}${mine ? ' (you)' : ''}</span>
+        <span class="lb-streak">${e.bestStreak || 0}🔥 best</span>
+        <span class="lb-score">${e.score || 0} pts</span>
+      </div>`;
+    }).join('');
+  }
+
+  async function initFirebase(){
+    try{
+      const [{ initializeApp }, { getAuth, signInAnonymously, onAuthStateChanged }, { getFirestore, doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp }] = await Promise.all([
+        import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js"),
+        import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js"),
+        import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js")
+      ]);
+      const app = initializeApp(FIREBASE_CONFIG);
+      const auth = getAuth(app);
+      firebase = { db: getFirestore(app), doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp };
+
+      onAuthStateChanged(auth, account => {
+        if(!account) return;
+        uid = account.uid;
+        lbStatus.textContent = 'live';
+        lbStatus.classList.add('live');
+
+        if(!playerName) openNameModal();
+        syncToCloud();
+
+        if(leaderboardUnsub) leaderboardUnsub();
+        leaderboardUnsub = firebase.onSnapshot(
+          firebase.query(firebase.collection(firebase.db, 'leaderboards', 'guess-the-day', 'entries'), firebase.orderBy('bestStreak', 'desc'), firebase.limit(10)),
+          snap => renderLeaderboard(snap.docs.map(d => ({ ...d.data(), __uid: d.id }))),
+          err => { console.warn('Leaderboard read failed:', err); lbStatus.textContent = 'offline'; lbList.innerHTML = '<div class="lb-empty">Leaderboard unavailable right now.</div>'; }
+        );
+      });
+
+      signInAnonymously(auth).catch(err => {
+        console.warn('Anonymous sign-in failed:', err);
+        lbStatus.textContent = 'offline';
+        lbList.innerHTML = '<div class="lb-empty">Leaderboard unavailable right now.</div>';
+      });
+    } catch(err){
+      console.warn('Firebase init failed:', err);
+      lbStatus.textContent = 'offline';
+      lbList.innerHTML = '<div class="lb-empty">Leaderboard unavailable right now.</div>';
+    }
+  }
+
+  refreshChangeNameLabel();
+  initFirebase();
+
+  buildGrid();
+  newRound();
+})();
+</script>
+</body>
+</html>
