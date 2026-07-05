@@ -822,7 +822,7 @@ function renderMethodParams(){
         <label>Assumed annual inflation rate (past = future)</label>
         <input type="number" step="0.005" id="inflInput" value="${state.inflRate}">
       </div>
-      <p class="helperNote">The model inflates historic incremental payments up to the monetary terms of the most recent accident year using this rate, fits the chain ladder on that basis, then re-inflates only the projected future payments to the calendar year they'll actually be paid.</p>`;
+      <p class="helperNote">The model deflates historic incremental payments to Year-1 terms using this rate, fits the chain ladder on real terms, then re-inflates only the projected future payments to the calendar year they'll actually be paid.</p>`;
     document.getElementById('inflInput').addEventListener('change', e=>{
       state.inflRate = parseFloat(e.target.value)||0;
     });
@@ -870,14 +870,12 @@ function runBF(cum, n, premium, elr){
 
 function runInflationAdjusted(cum, n, rate){
   const inc = toIncremental(cum, n);
-  // Inflate every known incremental payment up (or down) to the monetary terms of
-  // the MOST RECENT accident year (the diagonal cell where i+j = n-1 is the base,
-  // exponent 0). Older cells (i+j < n-1) get inflated up towards present-day terms.
+  // deflate
   const incDefl = inc.map(r=>r.slice());
   for(let i=0;i<n;i++) for(let j=0;j<n;j++){
-    if(isKnown(i,j,n)) incDefl[i][j] = inc[i][j]*Math.pow(1+rate, (n-1)-(i+j));
+    if(isKnown(i,j,n)) incDefl[i][j] = inc[i][j]/Math.pow(1+rate, i+j);
   }
-  // re-accumulate (still in "most recent accident year" terms)
+  // re-accumulate deflated
   const cumDefl = [];
   for(let i=0;i<n;i++){
     const row = new Array(n).fill(null);
@@ -891,8 +889,7 @@ function runInflationAdjusted(cum, n, rate){
   }
   const factors = volumeWeightedFactors(cumDefl, n);
   const projDefl = projectWithFactors(cumDefl, factors, n);
-  // future incremental (still in "most recent accident year" terms) -> re-inflate to
-  // the actual future calendar year each payment falls in -> sum per row for the reserve.
+  // future incremental deflated -> reinflate -> sum per row, also build nominal projected cum for display
   const reserve = [], ultimateNominal=[];
   const projNominal = cum.map(r=>r.slice());
   for(let i=0;i<n;i++){
@@ -900,7 +897,7 @@ function runInflationAdjusted(cum, n, rate){
     let runningNominal = cum[i][n-1-i];
     for(let j=n-i;j<n;j++){
       const incFDefl = projDefl[i][j]-projDefl[i][j-1];
-      const incFNominal = incFDefl*Math.pow(1+rate, (i+j)-(n-1));
+      const incFNominal = incFDefl*Math.pow(1+rate, i+j);
       sumFuture += incFNominal;
       runningNominal += incFNominal;
       projNominal[i][j] = runningNominal;
@@ -923,11 +920,7 @@ function runAvgCost(cum, counts, n){
     }
     avgCost.push(row);
   }
-  // Grossing-up factors for average cost are calculated the same way as for the
-  // claim-count triangle (and the same way as the basic chain ladder) — volume
-  // weighted — so "repeat the last step for the claim number table" is a genuine
-  // repeat of the same calculation, just on a different triangle.
-  const costFactors = volumeWeightedFactors(avgCost, n);
+  const costFactors = simpleAverageFactors(avgCost, n);
   const projAvgCost = projectWithFactors(avgCost, costFactors, n);
   const latest=[], ultimateCounts=[], ultimateAvgCost=[], ultimate=[], reserve=[];
   for(let i=0;i<n;i++){
@@ -979,10 +972,10 @@ function runCalculation(){
     stepsHost.innerHTML = `
       <h3>Workings — Basic Chain Ladder</h3>
       <ol class="stepList">
-        <li>Calculate development factors from the cumulative claims data — Σ (next column) ÷ Σ (this column), summed down accident years where both cells are known:
+        <li>Development factor for each column = Σ (next column) ÷ Σ (this column), summed down accident years where both cells are known:
           <span class="formula">f = ${r.factors.map(f=>fmt2(f)).join('  ·  ')}</span>
         </li>
-        <li>Use these development factors to project the future cumulative claims: starting from the latest diagonal, multiply across by the successive factors to reach the final development column — that's the Ultimate column on the right.</li>
+        <li>Starting from the latest diagonal, multiply across by the successive factors to reach the final development column — that's the Ultimate column on the right.</li>
         <li>Reserve = Ultimate − latest known cumulative claims, read straight off each row.</li>
       </ol>`;
     renderResultsAndCharts(chartsHost, labels, r.reserve, r.factors, 'Development factors');
@@ -995,11 +988,10 @@ function runCalculation(){
     stepsHost.innerHTML = `
       <h3>Workings — Bornhuetter–Ferguson</h3>
       <ol class="stepList">
-        <li>Decide on the loss ratio, and calculate development factors as in the basic chain ladder method: <span class="formula">f = ${r.factors.map(f=>fmt2(f)).join('  ·  ')}</span></li>
-        <li>Calculate the cumulative development factor to ultimate for each accident year (product of the remaining factors).</li>
-        <li>Multiply the earned premium by the loss ratio to get the initial estimate of the ultimate loss for each accident year.</li>
-        <li>Use the initial estimate and cumulative development factor to find the expected amount paid so far (Initial ultimate ÷ CDF) — the difference between that and the initial ultimate is the emerging liability (the reserve).</li>
-        <li>Revised ultimate = reported liability (latest known figure) + emerging liability. Summing the revised ultimates gives the total liability.</li>
+        <li>Initial ultimate = Premium × Expected loss ratio, for each accident year.</li>
+        <li>Development factors (same as chain ladder): <span class="formula">f = ${r.factors.map(f=>fmt2(f)).join('  ·  ')}</span></li>
+        <li>Grossing-up factor to ultimate from each year's current position, then: <span class="formula">Future claims = Premium × ELR × (1 − 1/f)</span></li>
+        <li>Reserve = that future-claims figure. Ultimate (right-hand column) = latest paid + reserve.</li>
       </ol>`;
     renderResultsAndCharts(chartsHost, labels, r.reserve, r.factors, 'Development factors');
   }
@@ -1011,12 +1003,12 @@ function runCalculation(){
     stepsHost.innerHTML = `
       <h3>Workings — Inflation-Adjusted Chain Ladder</h3>
       <ol class="stepList">
-        <li>Convert cumulative claims to incremental, then apply past inflation factors (${(state.inflRate*100).toFixed(1)}% p.a.) so every cell is expressed in the monetary terms of the most recent accident year.</li>
-        <li>Accumulate this re-based data and calculate development factors from it: <span class="formula">f = ${r.factors.map(f=>fmt2(f)).join('  ·  ')}</span></li>
-        <li>Use these development factors to project the future cumulative claims (still expressed in the monetary terms of the most recent accident year).</li>
-        <li>Disaccumulate the projected data to make it incremental again, then apply future inflation assumptions to convert each outstanding payment into the amount relating to the calendar year it will actually be paid — summed per row, that's the reserve.</li>
+        <li>Convert cumulative claims to incremental, then deflate each cell to Year-1 terms using ${(state.inflRate*100).toFixed(1)}% p.a.</li>
+        <li>Re-accumulate the deflated increments and fit chain-ladder factors on this "real terms" triangle: <span class="formula">f = ${r.factors.map(f=>fmt2(f)).join('  ·  ')}</span></li>
+        <li>Project the deflated triangle to ultimate, then de-accumulate to isolate future incremental payments (still in Year-1 terms).</li>
+        <li>Re-inflate each future payment to the calendar year it will actually be paid, then sum across future periods for the reserve.</li>
       </ol>`;
-    renderResultsAndCharts(chartsHost, labels, r.reserve, r.factors, 'Development factors (re-based data)');
+    renderResultsAndCharts(chartsHost, labels, r.reserve, r.factors, 'Real-terms development factors');
   }
 
   if(state.method==='avgcost'){
@@ -1041,10 +1033,10 @@ function runCalculation(){
     stepsHost.innerHTML = `
       <h3>Workings — Average Cost per Claim</h3>
       <ol class="stepList">
-        <li>Divide each cell in the cumulative claims table by the corresponding cell in the claim number table — this gives the average cost per claim (ACPC) triangle.</li>
-        <li>Calculate grossing-up factors for the average claim amounts (same method as the basic chain ladder), and use these to estimate the final average cost for each accident year: <span class="formula">f = ${r.costFactors.map(f=>fmt2(f)).join('  ·  ')}</span></li>
-        <li>Repeat the same grossing-up calculation for the claim number table to get the ultimate count for each accident year: <span class="formula">f = ${r.countFactors.map(f=>fmt2(f)).join('  ·  ')}</span></li>
-        <li>For each accident year, multiply the ultimate average cost by the ultimate count to get ultimate claims. Reserve = Ultimate claims − latest paid. Summing over all accident years gives the total projected loss estimate.</li>
+        <li>Project the claim-<em>counts</em> triangle to ultimate with its own chain-ladder factors: <span class="formula">f = ${r.countFactors.map(f=>fmt2(f)).join('  ·  ')}</span></li>
+        <li>Build the average-cost triangle: cumulative payments ÷ cumulative settled counts, cell by cell.</li>
+        <li>Project average cost to ultimate using its own factors (simple average of individual ratios, so large accident years don't dominate): <span class="formula">f = ${r.costFactors.map(f=>fmt2(f)).join('  ·  ')}</span></li>
+        <li>Ultimate claims = Ultimate count × Ultimate average cost. Reserve = Ultimate claims − latest paid.</li>
       </ol>`;
     renderResultsAndCharts(chartsHost, labels, r.reserve, r.costFactors, 'Average-cost development factors');
   }
@@ -1304,23 +1296,22 @@ function revealQuizWorkings(){
       <ol class="stepList">
         <li>Development factors: ${result.factors.map(f=>fmt2(f)).join('  ·  ')}</li>
         <li>Initial ultimate = Premium × ELR, per accident year.</li>
-        <li>Expected paid so far = Initial ultimate ÷ CDF; emerging liability (reserve) = Initial ultimate − expected paid so far.</li>
-        <li>Revised ultimate = latest known figure (reported liability) + emerging liability.</li>
+        <li>% unpaid = 1 − 1/CDF, applied to the initial ultimate to get the BF reserve.</li>
       </ol>`;
   } else if(quizState.method==='infl'){
     stepsHtml = `<h3>Full workings — Inflation-Adjusted Chain Ladder</h3>
       <ol class="stepList">
-        <li>Apply past inflation (${(quizState.inflRate*100).toFixed(1)}% p.a.) to each known incremental payment so it's expressed in the monetary terms of the most recent accident year, then re-accumulate.</li>
-        <li>Development factors on the re-based data: ${result.factors.map(f=>fmt2(f)).join('  ·  ')}</li>
-        <li>Project the re-based triangle to ultimate, disaccumulate to future increments (still in most-recent-accident-year terms), then apply future inflation to convert each to the amount relating to its actual future payment year.</li>
-        <li>Reserve = sum of those re-inflated future increments, per accident year.</li>
+        <li>Deflate each known incremental payment to Year-1 terms at ${(quizState.inflRate*100).toFixed(1)}% p.a., then re-accumulate.</li>
+        <li>Real-terms development factors: ${result.factors.map(f=>fmt2(f)).join('  ·  ')}</li>
+        <li>Project the deflated triangle to ultimate, de-accumulate to future increments (still Year-1 terms), then re-inflate each to its actual payment year.</li>
+        <li>Reserve = sum of the re-inflated future increments, per accident year.</li>
       </ol>`;
   } else {
     stepsHtml = `<h3>Full workings — Average Cost per Claim</h3>
       <ol class="stepList">
-        <li>Average cost per claim (ACPC) = cumulative payments ÷ cumulative settled counts, cell by cell.</li>
-        <li>Grossing-up factors for average cost (same method as basic chain ladder): ${result.costFactors.map(f=>fmt2(f)).join('  ·  ')}, projected to ultimate average cost.</li>
-        <li>Repeat the same calculation for the claim-count triangle: ${result.countFactors.map(f=>fmt2(f)).join('  ·  ')}, projected to ultimate counts.</li>
+        <li>Claim-count development factors: ${result.countFactors.map(f=>fmt2(f)).join('  ·  ')}, projected to ultimate counts.</li>
+        <li>Average cost = cumulative payments ÷ cumulative settled counts, cell by cell.</li>
+        <li>Average-cost development factors (simple average): ${result.costFactors.map(f=>fmt2(f)).join('  ·  ')}, projected to ultimate average cost.</li>
         <li>Ultimate = Ultimate count × Ultimate average cost. Reserve = Ultimate − Latest paid.</li>
       </ol>`;
   }
