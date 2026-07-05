@@ -218,9 +218,11 @@
   .answerRow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);}
   .answerRow input{width:110px;text-align:right;padding:6px 8px;border:1px solid var(--border);border-radius:7px;font-family:'JetBrains Mono',monospace;background:var(--bg3);color:var(--text);}
   .answerRow.correct input{border-color:var(--ok);background:rgba(95,179,163,0.18);}
+  .answerRow.close input{border-color:var(--accent);background:rgba(242,169,59,0.15);}
   .answerRow.wrong input{border-color:var(--danger);background:rgba(226,102,91,0.15);}
   .verdictTag{font-size:11px;font-family:'JetBrains Mono',monospace;padding:2px 6px;border-radius:3px;}
   .verdictTag.correct{background:var(--ok);color:#08251f;}
+  .verdictTag.close{background:var(--accent);color:var(--accent-ink);}
   .verdictTag.wrong{background:var(--danger);color:#fff;}
   .scoreBadge{
     display:inline-block;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;
@@ -300,6 +302,7 @@
           </div>
           <div class="btnRow">
             <button class="actionBtn secondary" id="exportExcelBtn">⬇ Export to Excel</button>
+            <button class="actionBtn secondary" id="copyDataBtn">📋 Copy data</button>
           </div>
           <p class="helperNote">Edit any cell in the known (white) triangle directly — the projection updates future (amber) cells when you click Project.</p>
         </div>
@@ -325,6 +328,16 @@
         <label style="font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);align-self:center;">Method:</label>
         <button class="actionBtn secondary quizMethodBtn active" data-qmethod="bcl">Basic Chain Ladder</button>
         <button class="actionBtn secondary quizMethodBtn" data-qmethod="bf">Bornhuetter–Ferguson</button>
+        <button class="actionBtn secondary quizMethodBtn" data-qmethod="infl">Inflation-Adjusted CL</button>
+        <button class="actionBtn secondary quizMethodBtn" data-qmethod="avgcost">Average Cost per Claim</button>
+      </div>
+
+      <div class="btnRow" style="margin-bottom:16px;">
+        <label style="font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);align-self:center;">Triangle size:</label>
+        <select id="quizSizeSelect" style="font-family:'JetBrains Mono',monospace;font-size:13px;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 10px;">
+          <option value="4">4 × 4</option>
+          <option value="5" selected>5 × 5</option>
+        </select>
       </div>
 
       <div class="btnRow" style="margin-bottom:18px;">
@@ -332,6 +345,7 @@
         <button class="actionBtn" id="checkAnswerBtn">Check my answer</button>
         <button class="actionBtn secondary" id="revealBtn">Show full workings</button>
         <button class="actionBtn secondary" id="exportQuizExcelBtn">⬇ Export to Excel</button>
+        <button class="actionBtn secondary" id="copyQuizDataBtn">📋 Copy data</button>
       </div>
 
       <div class="btnRow" style="margin-bottom:18px;gap:16px;">
@@ -460,6 +474,32 @@ function randomTriangle(n, jitter=0.12){
   return tri;
 }
 
+// Generates a plausible claim-counts (settled claims) triangle for quiz mode's
+// Average Cost per Claim questions — same "grow then plateau" shape as
+// makeSampleCounts()/randomTriangle(), just on a claim-count scale.
+function randomCounts(n, jitter=0.1){
+  const tri = [];
+  const baseStart = 55 + Math.random()*45;
+  const curve = [];
+  let f = 1.3 + Math.random()*0.3;
+  for(let k=0;k<n-1;k++){
+    curve.push(f);
+    f = 1 + (f-1)*(0.4+Math.random()*0.2);
+  }
+  for(let i=0;i<n;i++){
+    const row = new Array(n).fill(null);
+    let val = baseStart*(1+0.08*i)*(1+(Math.random()-0.5)*jitter);
+    row[0]=Math.round(val);
+    for(let j=1;j<n;j++){
+      const jf = curve[j-1]*(1+(Math.random()-0.5)*0.05);
+      val = val*jf;
+      row[j]=Math.round(val);
+    }
+    tri.push(row);
+  }
+  return tri;
+}
+
 function toIncremental(cum, n){
   const inc = [];
   for(let i=0;i<n;i++){
@@ -516,9 +556,16 @@ function cdfToUltimate(factors, fromIndex){
   return f;
 }
 
+// Claim amounts show up to 2 decimal places, with trailing zeros trimmed
+// (2.10 -> "2.1", 2.00 -> "2") rather than a configurable setting.
 function fmt(x){
   if(x===null||x===undefined||isNaN(x)) return '—';
-  return Math.round(x).toLocaleString('en-US');
+  return Number(x).toLocaleString('en-US', {maximumFractionDigits:2});
+}
+// Rounds x to 2dp and returns a plain Number (for Excel export / copy, not display).
+function roundTo(x){
+  if(x===null||x===undefined||isNaN(x)) return x;
+  return Math.round(x*100)/100;
 }
 function fmt2(x){
   if(x===null||x===undefined||isNaN(x)) return '—';
@@ -1009,6 +1056,10 @@ document.querySelectorAll('.methodTabs button').forEach(btn=>{
   btn.addEventListener('click', ()=>setMethod(btn.dataset.method));
 });
 document.getElementById('sizeSelect').addEventListener('change', e=>resizeTriangles(+e.target.value));
+document.getElementById('quizSizeSelect').addEventListener('change', e=>{
+  quizState.n = +e.target.value;
+  newQuizQuestion();
+});
 document.getElementById('startYearInput').addEventListener('change', e=>{
   state.startYear = parseInt(e.target.value,10) || TEXTBOOK_START_YEAR;
   setMethod(state.method);
@@ -1059,6 +1110,8 @@ function newQuizQuestion(){
   quizState.premium = [];
   quizState.elr = [];
   for(let i=0;i<n;i++){ quizState.premium.push(Math.round(quizState.cum[i][0]*(3+Math.random()))); quizState.elr.push(0.7+Math.random()*0.15); }
+  quizState.inflRate = Math.round((0.02 + Math.random()*0.04)*1000)/1000; // 2%–6% p.a.
+  quizState.counts = randomCounts(n);
   quizState.solved = null;
   document.getElementById('quizStepsHost').classList.add('hidden');
   document.getElementById('quizStepsHost').innerHTML='';
@@ -1072,6 +1125,18 @@ function newQuizQuestion(){
       rows += `<tr><td>AY ${i+1}</td><td>${fmt(quizState.premium[i])}</td><td>${quizState.elr[i].toFixed(2)}</td></tr>`;
     }
     paramsHost.innerHTML = `<table class="resultTable"><thead><tr><th>Accident year</th><th>Premium</th><th>ELR</th></tr></thead><tbody>${rows}</tbody></table>`;
+  } else if(quizState.method==='infl'){
+    paramsHost.innerHTML = `
+      <div class="controlBlock">
+        <label>Assumed annual inflation rate (past = future)</label>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--accent);">${(quizState.inflRate*100).toFixed(1)}%</div>
+      </div>`;
+  } else if(quizState.method==='avgcost'){
+    paramsHost.innerHTML = `<p class="sectionLabel" style="margin-top:0;">Claim counts triangle (settled claims)</p>`;
+    const countsGrid = document.createElement('div');
+    countsGrid.className = 'triangleScroll';
+    paramsHost.appendChild(countsGrid);
+    renderTriangleGrid(countsGrid, quizState.counts, n, {editable:false});
   } else {
     paramsHost.innerHTML='';
   }
@@ -1101,15 +1166,29 @@ function updateQuizTotal(){
   if(totalInp) totalInp.value = total;
 }
 
+function computeQuizResult(){
+  const n = quizState.n;
+  if(quizState.method==='bcl') return runBCL(quizState.cum, n);
+  if(quizState.method==='bf') return runBF(quizState.cum, n, quizState.premium, quizState.elr);
+  if(quizState.method==='infl') return runInflationAdjusted(quizState.cum, n, quizState.inflRate);
+  return runAvgCost(quizState.cum, quizState.counts, n);
+}
+
+// Three tiers instead of a flat right/wrong: within `tolerance` is correct (green),
+// within `closeTolerance` is close (orange, encouraging — you're in the right ballpark),
+// anything further out is wrong (red).
+function classifyAnswer(userVal, trueVal, tolerance, closeTolerance){
+  if(isNaN(userVal)) return 'wrong';
+  const diff = Math.abs(userVal-trueVal);
+  if(diff <= tolerance) return 'correct';
+  if(diff <= closeTolerance) return 'close';
+  return 'wrong';
+}
+
 function checkQuizAnswer(){
   updateQuizTotal();
   const n = quizState.n;
-  let result;
-  if(quizState.method==='bcl'){
-    result = runBCL(quizState.cum, n);
-  } else {
-    result = runBF(quizState.cum, n, quizState.premium, quizState.elr);
-  }
+  const result = computeQuizResult();
   quizState.solved = result;
 
   let correctCount=0;
@@ -1119,18 +1198,20 @@ function checkQuizAnswer(){
     const userVal = parseFloat(inp.value);
     const trueVal = result.reserve[i];
     const tolerance = Math.max(Math.abs(trueVal)*0.05, 20);
-    const ok = !isNaN(userVal) && Math.abs(userVal-trueVal) <= tolerance;
-    row.classList.remove('correct','wrong');
-    row.classList.add(ok?'correct':'wrong');
-    if(ok) correctCount++;
+    const verdict = classifyAnswer(userVal, trueVal, tolerance, tolerance*3);
+    row.classList.remove('correct','close','wrong');
+    row.classList.add(verdict);
+    if(verdict==='correct') correctCount++;
   }
   const totalTrue = result.reserve.reduce((a,b)=>a+b,0);
   const totalInp = document.getElementById('ansTotal');
   const totalUser = parseFloat(totalInp.value);
   const totalRow = document.querySelector('.answerRow[data-ay="total"]');
-  const totalOk = !isNaN(totalUser) && Math.abs(totalUser-totalTrue) <= Math.max(totalTrue*0.05,50);
-  totalRow.classList.remove('correct','wrong');
-  totalRow.classList.add(totalOk?'correct':'wrong');
+  const totalTolerance = Math.max(totalTrue*0.05,50);
+  const totalVerdict = classifyAnswer(totalUser, totalTrue, totalTolerance, totalTolerance*3);
+  totalRow.classList.remove('correct','close','wrong');
+  totalRow.classList.add(totalVerdict);
+  const totalOk = totalVerdict==='correct';
 
   quizState.score.total++;
   const fullyCorrect = correctCount===n && totalOk;
@@ -1149,7 +1230,7 @@ function checkQuizAnswer(){
 
 function revealQuizWorkings(){
   const n = quizState.n;
-  const result = quizState.solved || (quizState.method==='bcl' ? runBCL(quizState.cum,n) : runBF(quizState.cum,n,quizState.premium,quizState.elr));
+  const result = quizState.solved || computeQuizResult();
   quizState.solved = result;
   const labels = ayLabels(n);
   const host = document.getElementById('quizStepsHost');
@@ -1162,12 +1243,28 @@ function revealQuizWorkings(){
         <li>Projected ultimate = Latest paid × product of remaining factors, for each accident year.</li>
         <li>Reserve = Ultimate − Latest paid.</li>
       </ol>`;
-  } else {
+  } else if(quizState.method==='bf'){
     stepsHtml = `<h3>Full workings — Bornhuetter–Ferguson</h3>
       <ol class="stepList">
         <li>Development factors: ${result.factors.map(f=>fmt2(f)).join('  ·  ')}</li>
         <li>Initial ultimate = Premium × ELR, per accident year.</li>
         <li>% unpaid = 1 − 1/CDF, applied to the initial ultimate to get the BF reserve.</li>
+      </ol>`;
+  } else if(quizState.method==='infl'){
+    stepsHtml = `<h3>Full workings — Inflation-Adjusted Chain Ladder</h3>
+      <ol class="stepList">
+        <li>Deflate each known incremental payment to Year-1 terms at ${(quizState.inflRate*100).toFixed(1)}% p.a., then re-accumulate.</li>
+        <li>Real-terms development factors: ${result.factors.map(f=>fmt2(f)).join('  ·  ')}</li>
+        <li>Project the deflated triangle to ultimate, de-accumulate to future increments (still Year-1 terms), then re-inflate each to its actual payment year.</li>
+        <li>Reserve = sum of the re-inflated future increments, per accident year.</li>
+      </ol>`;
+  } else {
+    stepsHtml = `<h3>Full workings — Average Cost per Claim</h3>
+      <ol class="stepList">
+        <li>Claim-count development factors: ${result.countFactors.map(f=>fmt2(f)).join('  ·  ')}, projected to ultimate counts.</li>
+        <li>Average cost = cumulative payments ÷ cumulative settled counts, cell by cell.</li>
+        <li>Average-cost development factors (simple average): ${result.costFactors.map(f=>fmt2(f)).join('  ·  ')}, projected to ultimate average cost.</li>
+        <li>Ultimate = Ultimate count × Ultimate average cost. Reserve = Ultimate − Latest paid.</li>
       </ol>`;
   }
   host.innerHTML = stepsHtml + '<div id="quizResultTable"></div>';
@@ -1182,70 +1279,149 @@ document.getElementById('revealBtn').addEventListener('click', revealQuizWorking
    EXCEL EXPORT (SheetJS)
    ============================================================ */
 
-function buildTriangleSheet(cum, n, projected, labels){
+// These build plain row-arrays (arrays of arrays) so the exact same data can be
+// turned into either an Excel sheet (XLSX.utils.aoa_to_sheet) or a tab-separated
+// text block for the "Copy data" clipboard buttons. All claim amounts are rounded
+// to the current header "Decimals" setting rather than forced to whole numbers.
+
+function triangleRows(cum, n, projected, labels){
   const rows = [['Accident Year', ...Array.from({length:n},(_,j)=>'Dev '+j)]];
   for(let i=0;i<n;i++){
     const row = [labels ? labels[i] : 'AY '+(i+1)];
     for(let j=0;j<n;j++){
-      if(isKnown(i,j,n)) row.push(cum[i][j]);
-      else row.push(projected ? Math.round(projected[i][j]) : null);
+      if(isKnown(i,j,n)) row.push(roundTo(cum[i][j]));
+      else row.push(projected ? roundTo(projected[i][j]) : null);
     }
     rows.push(row);
   }
-  return XLSX.utils.aoa_to_sheet(rows);
+  return rows;
 }
 
-function buildSummarySheet(labels, latest, ultimate, reserve){
+function summaryRows(labels, latest, ultimate, reserve){
   const rows = [['Accident Year','Latest Paid','Ultimate','Reserve']];
   let tL=0,tU=0,tR=0;
   for(let i=0;i<labels.length;i++){
-    rows.push([labels[i], Math.round(latest[i]), Math.round(ultimate[i]), Math.round(reserve[i])]);
+    rows.push([labels[i], roundTo(latest[i]), roundTo(ultimate[i]), roundTo(reserve[i])]);
     tL+=latest[i]; tU+=ultimate[i]; tR+=reserve[i];
   }
-  rows.push(['Total', Math.round(tL), Math.round(tU), Math.round(tR)]);
-  return XLSX.utils.aoa_to_sheet(rows);
+  rows.push(['Total', roundTo(tL), roundTo(tU), roundTo(tR)]);
+  return rows;
+}
+
+function factorsRows(factors, label){
+  const rows = [[label||'Development period','Factor']];
+  factors.forEach((f,idx)=> rows.push([`${idx} → ${idx+1}`, Number(f.toFixed(4))]));
+  return rows;
+}
+
+function buildTriangleSheet(cum, n, projected, labels){
+  return XLSX.utils.aoa_to_sheet(triangleRows(cum, n, projected, labels));
+}
+
+function buildSummarySheet(labels, latest, ultimate, reserve){
+  return XLSX.utils.aoa_to_sheet(summaryRows(labels, latest, ultimate, reserve));
 }
 
 function buildFactorsSheet(factors, label){
-  const rows = [[label||'Development period','Factor']];
-  factors.forEach((f,idx)=> rows.push([`${idx} → ${idx+1}`, Number(f.toFixed(4))]));
-  return XLSX.utils.aoa_to_sheet(rows);
+  return XLSX.utils.aoa_to_sheet(factorsRows(factors, label));
 }
 
-document.getElementById('exportExcelBtn').addEventListener('click', ()=>{
+// Converts one or more labelled row-blocks into a single tab-separated text block,
+// suitable for pasting straight into Excel/Word/Sheets.
+function rowsToTSV(blocks){
+  return blocks.map(b=>{
+    const body = b.rows.map(r=>r.map(c=>c===null||c===undefined?'':c).join('\t')).join('\n');
+    return (b.title ? b.title+'\n' : '') + body;
+  }).join('\n\n');
+}
+
+function copyTextToClipboard(text, btn){
+  const done = ok=>{
+    if(!btn) return;
+    const original = btn.dataset.originalLabel || btn.textContent;
+    btn.dataset.originalLabel = original;
+    btn.textContent = ok ? '✓ Copied!' : '✗ Copy failed';
+    setTimeout(()=>{ btn.textContent = original; }, 1400);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>done(true)).catch(()=>done(false));
+  } else {
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done(true);
+    }catch(err){ done(false); }
+  }
+}
+
+// Builds the same set of labelled row-blocks used for BOTH the Excel export and the
+// "Copy data" clipboard button, so the two stay perfectly in sync.
+function buildLearnDataBlocks(){
   if(!state.lastResult){ runCalculation(); }
   const n = state.n, labels = ayLabels(n, state.startYear);
   const r = state.lastResult;
-  const wb = XLSX.utils.book_new();
-
-  let projectedTri = r.proj || r.projNominal || state.cum;
-  XLSX.utils.book_append_sheet(wb, buildTriangleSheet(state.cum, n, projectedTri, labels), 'Triangle');
-  XLSX.utils.book_append_sheet(wb, buildSummarySheet(labels, r.latest, r.ultimate, r.reserve), 'Reserve Summary');
+  const blocks = [];
+  const projectedTri = r.proj || r.projNominal || state.cum;
+  blocks.push({title:'Triangle', sheetName:'Triangle', rows: triangleRows(state.cum, n, projectedTri, labels)});
+  blocks.push({title:'Reserve Summary', sheetName:'Reserve Summary', rows: summaryRows(labels, r.latest, r.ultimate, r.reserve)});
 
   const factorSeries = r.factors || r.costFactors;
-  if(factorSeries) XLSX.utils.book_append_sheet(wb, buildFactorsSheet(factorSeries), 'Development Factors');
+  if(factorSeries) blocks.push({title:'Development Factors', sheetName:'Development Factors', rows: factorsRows(factorSeries)});
 
   if(state.method==='bf'){
     const rows = [['Accident Year','Premium','ELR','Initial Ultimate','% Unpaid']];
-    for(let i=0;i<n;i++) rows.push([labels[i], state.premium[i], state.elr[i], Math.round(r.initial[i]), Number((1-r.pctPaid[i]).toFixed(4))]);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'BF Assumptions');
+    for(let i=0;i<n;i++) rows.push([labels[i], state.premium[i], state.elr[i], roundTo(r.initial[i]), Number((1-r.pctPaid[i]).toFixed(4))]);
+    blocks.push({title:'BF Assumptions', sheetName:'BF Assumptions', rows});
   }
   if(state.method==='avgcost'){
-    XLSX.utils.book_append_sheet(wb, buildTriangleSheet(state.counts, n, r.projCounts, labels), 'Claim Counts');
+    blocks.push({title:'Claim Counts', sheetName:'Claim Counts', rows: triangleRows(state.counts, n, r.projCounts, labels)});
   }
+  return blocks;
+}
 
+function buildQuizDataBlocks(){
+  const n = quizState.n, labels = ayLabels(n);
+  const result = quizState.solved || computeQuizResult();
+  quizState.solved = result;
+  const blocks = [];
+  blocks.push({title:'Triangle (known)', sheetName:'Triangle (known)', rows: triangleRows(quizState.cum, n, null, labels)});
+  blocks.push({title:'Solution', sheetName:'Solution', rows: summaryRows(labels, result.latest, result.ultimate, result.reserve)});
+  if(result.factors) blocks.push({title:'Development Factors', sheetName:'Development Factors', rows: factorsRows(result.factors)});
+  if(quizState.method==='avgcost'){
+    blocks.push({title:'Claim Counts', sheetName:'Claim Counts', rows: triangleRows(quizState.counts, n, result.projCounts, labels)});
+    blocks.push({title:'Avg Cost Factors', sheetName:'Avg Cost Factors', rows: factorsRows(result.costFactors, 'Avg-cost development')});
+  }
+  if(quizState.method==='infl'){
+    blocks.push({title:'Assumptions', sheetName:'Assumptions', rows: [['Assumed annual inflation rate', quizState.inflRate]]});
+  }
+  return blocks;
+}
+
+document.getElementById('exportExcelBtn').addEventListener('click', ()=>{
+  const blocks = buildLearnDataBlocks();
+  const wb = XLSX.utils.book_new();
+  blocks.forEach(b=> XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(b.rows), b.sheetName));
   XLSX.writeFile(wb, `runoff-triangle-${state.method}.xlsx`);
 });
 
+document.getElementById('copyDataBtn').addEventListener('click', e=>{
+  const blocks = buildLearnDataBlocks();
+  copyTextToClipboard(rowsToTSV(blocks), e.currentTarget);
+});
+
 document.getElementById('exportQuizExcelBtn').addEventListener('click', ()=>{
-  const n = quizState.n, labels = ayLabels(n);
-  const result = quizState.solved || (quizState.method==='bcl' ? runBCL(quizState.cum,n) : runBF(quizState.cum,n,quizState.premium,quizState.elr));
-  quizState.solved = result;
+  const blocks = buildQuizDataBlocks();
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, buildTriangleSheet(quizState.cum, n, null, labels), 'Triangle (known)');
-  XLSX.utils.book_append_sheet(wb, buildSummarySheet(labels, result.latest, result.ultimate, result.reserve), 'Solution');
-  if(result.factors) XLSX.utils.book_append_sheet(wb, buildFactorsSheet(result.factors), 'Development Factors');
+  blocks.forEach(b=> XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(b.rows), b.sheetName));
   XLSX.writeFile(wb, `runoff-triangle-quiz-${quizState.method}.xlsx`);
+});
+
+document.getElementById('copyQuizDataBtn').addEventListener('click', e=>{
+  const blocks = buildQuizDataBlocks();
+  copyTextToClipboard(rowsToTSV(blocks), e.currentTarget);
 });
 
 /* ============================================================
