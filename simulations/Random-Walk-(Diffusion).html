@@ -110,6 +110,54 @@
         .close-btn { margin-top: 20px; width: 100%; background: #222f3e; }
 
     </style>
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDgkPIFlgsZfkt1oWaHZPPUNPotRzGHROs",
+        authDomain: "simulating-statistics.firebaseapp.com",
+        projectId: "simulating-statistics",
+        storageBucket: "simulating-statistics.firebasestorage.app",
+        messagingSenderId: "1083477766541",
+        appId: "1:1083477766541:web:b85824bcc33820396f0dc4",
+        measurementId: "G-Z13XGH5QVL"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+
+    // Create a safe, global tracking function
+    window.trackEvent = (eventName, params = {}) => {
+        try {
+            logEvent(analytics, eventName, params);
+        } catch (e) {
+            console.warn("Analytics blocked (likely by an adblocker)", e);
+        }
+    };
+
+    // --- SHARED FIRESTORE / ANONYMOUS AUTH ---
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    window.firebaseDb = db;
+    window.firebaseHelpers = { doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp };
+
+    window.firebaseReady = new Promise((resolve) => {
+        onAuthStateChanged(auth, (account) => {
+            if (account) {
+                window.firebaseUid = account.uid;
+                resolve(account.uid);
+            }
+        });
+        signInAnonymously(auth).catch((e) => {
+            console.warn("Anonymous sign-in failed:", e);
+            resolve(null);
+        });
+    });
+</script>
 </head>
 <body>
 
