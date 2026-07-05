@@ -460,6 +460,51 @@ const TEXTBOOK_SAMPLE = [
 ];
 const TEXTBOOK_START_YEAR = 2015;
 
+// CM2 Chapter 18, Figures 9/10: same triangle/idea as above, used to illustrate the
+// inflation-adjusted chain ladder. A flat 5% future inflation rate is applied to the
+// basic-chain-ladder forecast (in "mid-2019 prices") to get the nominal reserve of 4,759.
+const TEXTBOOK_INFL_RATE = 0.05;
+
+// CM2 Chapter 18, Bornhuetter-Ferguson worked example (Figures ~11-13).
+// Cumulative INCURRED claims, AY1-AY6 (oldest first), DY0-DY5, in £'000.
+// Note: because these are incurred (not paid) figures, cells can occasionally dip
+// slightly between development years as case reserves are released.
+const TEXTBOOK_BF_SAMPLE = [
+  [2866, 3334, 3503, 3624, 3719, 3717],
+  [3359, 3889, 4033, 4231, 4319, null],
+  [3848, 4503, 4779, 4946, null, null],
+  [4673, 5422, 5676, null, null, null],
+  [5369, 6142, null, null, null, null],
+  [5818, null, null, null, null, null]
+];
+// ELR is a flat 83% in the textbook example; premiums are backed out from the
+// textbook's "Initial UL" figures (Initial UL = Premium x ELR).
+const TEXTBOOK_BF_ELR = 0.83;
+const TEXTBOOK_BF_PREMIUM = [4486, 5024, 5681, 6590, 7483, 8502];
+
+// CM2 Chapter 18, Average Cost per Claim worked example.
+// Average claim amount triangle (AY1-AY6, DY0-DY5), in £'000 per claim.
+const TEXTBOOK_ACPC_AVGCOST = [
+  [6.708, 7.096, 7.162, 7.365, 7.559, 7.524],
+  [7.179, 7.518, 7.553, 7.894, 8.013, null],
+  [7.540, 8.036, 8.355, 8.498, null, null],
+  [8.530, 9.221, 9.229, null, null, null],
+  [9.851, 10.152, null, null, null, null],
+  [10.445, null, null, null, null, null]
+];
+// Cumulative settled claim numbers, same AY/DY layout.
+const TEXTBOOK_ACPC_COUNTS = [
+  [414, 460, 482, 488, 492, 494],
+  [453, 506, 526, 536, 539, null],
+  [494, 548, 572, 582, null, null],
+  [530, 588, 615, null, null, null],
+  [545, 605, null, null, null, null],
+  [557, null, null, null, null, null]
+];
+// Total claims paid to date across all six accident years, per the textbook example
+// (claims paid to date = 20,334; total projected loss = 33,964; reserve = 13,630).
+const TEXTBOOK_ACPC_PAID_TO_DATE = 20334;
+
 function makeSampleCumulative(n){
   if(n===5) return TEXTBOOK_SAMPLE.map(r=>r.slice());
   // for other sizes, extend/trim the textbook's own development curve (~1.79, 1.58, 1.11, 1.03)
@@ -554,6 +599,21 @@ function toIncremental(cum, n){
     const row = new Array(n).fill(null);
     for(let j=0;j<n;j++){
       if(!isKnown(i,j,n)) continue;
+      row[j] = j===0 ? cum[i][0] : cum[i][j]-cum[i][j-1];
+    }
+    inc.push(row);
+  }
+  return inc;
+}
+
+// Like toIncremental, but computes every cell (including projected/future ones) —
+// needed once a triangle has been fully projected to ultimate, since toIncremental
+// deliberately skips anything outside the known region.
+function toIncrementalFull(cum, n){
+  const inc = [];
+  for(let i=0;i<n;i++){
+    const row = new Array(n).fill(null);
+    for(let j=0;j<n;j++){
       row[j] = j===0 ? cum[i][0] : cum[i][j]-cum[i][j-1];
     }
     inc.push(row);
@@ -673,7 +733,7 @@ const METHOD_INFO = {
   },
   infl: {
     title:'Inflation-Adjusted Chain Ladder',
-    intro:'Strips historic claims inflation out of the data before fitting development factors, then re-applies an assumed future inflation rate to the projected future payments — so both the pattern and the money reflect real growth, not just calendar-year inflation.'
+    intro:"Runs the basic chain ladder to get the future payments in today's money, then re-inflates each future increment forward at an assumed future inflation rate, based on how many years ahead it falls due — so the reserve reflects the money that will actually be paid, not just today's prices."
   },
   avgcost: {
     title:'Average Cost per Claim',
@@ -819,10 +879,10 @@ function renderMethodParams(){
   } else if(state.method==='infl'){
     host.innerHTML = `
       <div class="controlBlock">
-        <label>Assumed annual inflation rate (past = future)</label>
+        <label>Assumed future inflation rate</label>
         <input type="number" step="0.005" id="inflInput" value="${state.inflRate}">
       </div>
-      <p class="helperNote">The model deflates historic incremental payments to Year-1 terms using this rate, fits the chain ladder on real terms, then re-inflates only the projected future payments to the calendar year they'll actually be paid.</p>`;
+      <p class="helperNote">The model first runs a plain chain ladder on the triangle as given (i.e. in today's money), then re-inflates each future incremental payment forward by this rate, according to how many years ahead of today it falls due.</p>`;
     document.getElementById('inflInput').addEventListener('change', e=>{
       state.inflRate = parseFloat(e.target.value)||0;
     });
@@ -868,44 +928,30 @@ function runBF(cum, n, premium, elr){
   return {factors, latest, initial, cdf, pctPaid, reserve, ultimate};
 }
 
+// Inflation-adjusted chain ladder, following the CM2 approach: run a plain chain
+// ladder on the triangle exactly as given (i.e. treat it as being in "today's money"
+// already), then take the projected FUTURE incremental payments and re-inflate each
+// one forward at `rate`, compounding for the number of years between today (the
+// latest diagonal) and the calendar year in which that increment falls due.
 function runInflationAdjusted(cum, n, rate){
-  const inc = toIncremental(cum, n);
-  // deflate
-  const incDefl = inc.map(r=>r.slice());
-  for(let i=0;i<n;i++) for(let j=0;j<n;j++){
-    if(isKnown(i,j,n)) incDefl[i][j] = inc[i][j]/Math.pow(1+rate, i+j);
-  }
-  // re-accumulate deflated
-  const cumDefl = [];
-  for(let i=0;i<n;i++){
-    const row = new Array(n).fill(null);
-    let running=0;
-    for(let j=0;j<n;j++){
-      if(!isKnown(i,j,n)) break;
-      running += incDefl[i][j];
-      row[j]=running;
-    }
-    cumDefl.push(row);
-  }
-  const factors = volumeWeightedFactors(cumDefl, n);
-  const projDefl = projectWithFactors(cumDefl, factors, n);
-  // future incremental deflated -> reinflate -> sum per row, also build nominal projected cum for display
-  const reserve = [], ultimateNominal=[];
+  const bcl = runBCL(cum, n); // "today's prices" forecast
+  const projInc = toIncrementalFull(bcl.proj, n); // future increments too
   const projNominal = cum.map(r=>r.slice());
+  const reserve = [], ultimateNominal=[];
   for(let i=0;i<n;i++){
-    let sumFuture=0;
-    let runningNominal = cum[i][n-1-i];
+    let sumFuture = 0;
+    let running = cum[i][n-1-i];
     for(let j=n-i;j<n;j++){
-      const incFDefl = projDefl[i][j]-projDefl[i][j-1];
-      const incFNominal = incFDefl*Math.pow(1+rate, i+j);
-      sumFuture += incFNominal;
-      runningNominal += incFNominal;
-      projNominal[i][j] = runningNominal;
+      const yearsAhead = (i+j) - (n-1); // years beyond the current valuation diagonal
+      const incNominal = projInc[i][j] * Math.pow(1+rate, yearsAhead);
+      sumFuture += incNominal;
+      running += incNominal;
+      projNominal[i][j] = running;
     }
     reserve.push(sumFuture);
-    ultimateNominal.push(cum[i][n-1-i]+sumFuture);
+    ultimateNominal.push(cum[i][n-1-i] + sumFuture);
   }
-  return {factors, projDefl, projNominal, reserve, ultimate:ultimateNominal, latest:cum.map((r,i)=>r[n-1-i])};
+  return {factors: bcl.factors, projDefl: bcl.proj, projNominal, reserve, ultimate: ultimateNominal, latest: cum.map((r,i)=>r[n-1-i])};
 }
 
 function runAvgCost(cum, counts, n){
@@ -1003,12 +1049,12 @@ function runCalculation(){
     stepsHost.innerHTML = `
       <h3>Workings — Inflation-Adjusted Chain Ladder</h3>
       <ol class="stepList">
-        <li>Convert cumulative claims to incremental, then deflate each cell to Year-1 terms using ${(state.inflRate*100).toFixed(1)}% p.a.</li>
-        <li>Re-accumulate the deflated increments and fit chain-ladder factors on this "real terms" triangle: <span class="formula">f = ${r.factors.map(f=>fmt2(f)).join('  ·  ')}</span></li>
-        <li>Project the deflated triangle to ultimate, then de-accumulate to isolate future incremental payments (still in Year-1 terms).</li>
-        <li>Re-inflate each future payment to the calendar year it will actually be paid, then sum across future periods for the reserve.</li>
+        <li>Run a plain chain ladder on the triangle exactly as given (i.e. treat it as being in today's prices already): <span class="formula">f = ${r.factors.map(f=>fmt2(f)).join('  ·  ')}</span></li>
+        <li>This gives the future incremental payments in "today's money" terms — the diagonal-to-diagonal chain ladder forecast.</li>
+        <li>Re-inflate each future increment forward at ${(state.inflRate*100).toFixed(1)}% p.a., compounding for the number of years between now and when that payment actually falls due.</li>
+        <li>Reserve = sum of the re-inflated future increments, per accident year.</li>
       </ol>`;
-    renderResultsAndCharts(chartsHost, labels, r.reserve, r.factors, 'Real-terms development factors');
+    renderResultsAndCharts(chartsHost, labels, r.reserve, r.factors, "Development factors (today's prices)");
   }
 
   if(state.method==='avgcost'){
@@ -1118,7 +1164,51 @@ document.getElementById('randomizeBtn').addEventListener('click', ()=>{
   state.counts = makeSampleCounts(state.n);
   setMethod(state.method);
 });
-document.getElementById('resetBtn').addEventListener('click', ()=>resizeTriangles(state.n));
+document.getElementById('resetBtn').addEventListener('click', ()=>loadExampleData());
+
+// Loads the correct textbook (CM2) reference example for whichever method tab is
+// currently active. Falls back to the generic BCL-derived sample for triangle
+// sizes the specific textbook example doesn't cover (only BCL/Infl have a genuine
+// 5x5 IFoA reference; BF/AvgCost are genuine 6x6 IFoA references).
+function loadExampleData(){
+  const m = state.method;
+  if(m==='bf'){
+    state.n = 6;
+    state.cum = TEXTBOOK_BF_SAMPLE.map(r=>r.slice());
+    state.premium = TEXTBOOK_BF_PREMIUM.slice();
+    state.elr = new Array(6).fill(TEXTBOOK_BF_ELR);
+    state.startYear = TEXTBOOK_START_YEAR;
+    document.getElementById('sizeSelect').value = '6';
+  } else if(m==='avgcost'){
+    state.n = 6;
+    // Reconstruct the cumulative claims triangle from avg cost x counts (both given
+    // directly in the textbook), since that's what this app stores as `state.cum`.
+    const cum = [];
+    for(let i=0;i<6;i++){
+      const row = new Array(6).fill(null);
+      for(let j=0;j<6;j++){
+        if(isKnown(i,j,6)) row[j] = Math.round(TEXTBOOK_ACPC_AVGCOST[i][j]*TEXTBOOK_ACPC_COUNTS[i][j]);
+      }
+      cum.push(row);
+    }
+    state.cum = cum;
+    state.counts = TEXTBOOK_ACPC_COUNTS.map(r=>r.slice());
+    state.startYear = TEXTBOOK_START_YEAR;
+    document.getElementById('sizeSelect').value = '6';
+  } else {
+    // BCL and Inflation-Adjusted CL both use the genuine 5x5 CM2 Figure 1/9 triangle.
+    state.n = 5;
+    state.cum = TEXTBOOK_SAMPLE.map(r=>r.slice());
+    state.counts = makeSampleCounts(5);
+    state.premium = defaultPremium(5);
+    state.elr = new Array(5).fill(0.75);
+    state.startYear = TEXTBOOK_START_YEAR;
+    if(m==='infl') state.inflRate = TEXTBOOK_INFL_RATE;
+    document.getElementById('sizeSelect').value = '5';
+  }
+  document.getElementById('startYearInput').value = state.startYear;
+  setMethod(state.method);
+}
 
 /* ============================================================
    MODE TOGGLE
@@ -1176,7 +1266,7 @@ function newQuizQuestion(){
   } else if(quizState.method==='infl'){
     paramsHost.innerHTML = `
       <div class="controlBlock">
-        <label>Assumed annual inflation rate (past = future)</label>
+        <label>Assumed future inflation rate</label>
         <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--accent);">${(quizState.inflRate*100).toFixed(1)}%</div>
       </div>`;
   } else if(quizState.method==='avgcost'){
@@ -1301,9 +1391,9 @@ function revealQuizWorkings(){
   } else if(quizState.method==='infl'){
     stepsHtml = `<h3>Full workings — Inflation-Adjusted Chain Ladder</h3>
       <ol class="stepList">
-        <li>Deflate each known incremental payment to Year-1 terms at ${(quizState.inflRate*100).toFixed(1)}% p.a., then re-accumulate.</li>
-        <li>Real-terms development factors: ${result.factors.map(f=>fmt2(f)).join('  ·  ')}</li>
-        <li>Project the deflated triangle to ultimate, de-accumulate to future increments (still Year-1 terms), then re-inflate each to its actual payment year.</li>
+        <li>Run a plain chain ladder on the given triangle to get "today's prices" development factors: ${result.factors.map(f=>fmt2(f)).join('  ·  ')}</li>
+        <li>This gives the future incremental payments in today's money.</li>
+        <li>Re-inflate each future increment forward at ${(quizState.inflRate*100).toFixed(1)}% p.a., compounding for the number of years ahead it falls due.</li>
         <li>Reserve = sum of the re-inflated future increments, per accident year.</li>
       </ol>`;
   } else {
@@ -1443,7 +1533,7 @@ function buildQuizDataBlocks(){
     blocks.push({title:'Avg Cost Factors', sheetName:'Avg Cost Factors', rows: factorsRows(result.costFactors, 'Avg-cost development')});
   }
   if(quizState.method==='infl'){
-    blocks.push({title:'Assumptions', sheetName:'Assumptions', rows: [['Assumed annual inflation rate', quizState.inflRate]]});
+    blocks.push({title:'Assumptions', sheetName:'Assumptions', rows: [['Assumed future inflation rate', quizState.inflRate]]});
   }
   return blocks;
 }
