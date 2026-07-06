@@ -276,35 +276,7 @@
     window.firebaseDb = db;
     window.firebaseHelpers = { doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp };
 
-    window.firebaseReady = new Promise((resolve) => {
-onAuthStateChanged(auth, async account => {
-  if(!account) return;
-  fbUid = account.uid;
-  host.textContent = 'connecting…';
-
-  // Load whatever was already saved for this user BEFORE writing anything back —
-  // this is what stops the page from wiping your progress on every refresh.
-  try {
-    const snap = await fb.getDoc(fb.doc(fb.db, 'leaderboards', 'runoff-triangle-lab', 'entries', fbUid));
-    if (snap.exists()) {
-      const data = snap.data();
-      quizState.score.correct = data.score || 0;
-      quizState.score.total = data.total || 0;
-      quizState.streak = data.streak || 0;
-      quizState.bestStreak = data.bestStreak || 0;
-      document.getElementById('scoreBadge').textContent = `Score: ${quizState.score.correct} / ${quizState.score.total}`;
-      document.getElementById('streakBadge').textContent = `Streak: ${quizState.streak}`;
-      document.getElementById('bestStreakBadge').textContent = `Best: ${quizState.bestStreak}`;
-    }
-  } catch(e) { console.warn('Could not load previous progress:', e); }
-
-  if(rtLeaderboardUnsub) rtLeaderboardUnsub();
-  rtLeaderboardUnsub = fb.onSnapshot(
-    fb.query(fb.collection(fb.db, 'leaderboards', 'runoff-triangle-lab', 'entries'), fb.orderBy('bestStreak', 'desc'), fb.limit(10)),
-    snap => renderLeaderboard(snap.docs.map(d => ({ ...d.data(), __uid: d.id }))),
-    err => { console.warn('Leaderboard read failed:', err); host.textContent = 'Leaderboard unavailable right now.'; }
-  );
-});</script>
+  </script>
 </head>
 <body>
 
@@ -1645,25 +1617,42 @@ function renderLeaderboard(rows){
     </div>`;
   }).join('');
 }
-
 async function initFirebase(){
   const host = document.getElementById('leaderboardList');
   try{
-    const [{ initializeApp }, { getAuth, signInAnonymously, onAuthStateChanged }, { getFirestore, doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp }] = await Promise.all([
+    // Make sure getDoc is included in this destructuring list!
+    const [{ initializeApp }, { getAuth, signInAnonymously, onAuthStateChanged }, { getFirestore, doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp }] = await Promise.all([
       import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js"),
       import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js"),
       import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js")
     ]);
-    // Named app instance ("runoff-triangle-lab") rather than the default app,
-    // so this never collides with any other Firebase app initialized on the page.
+    
     const app = initializeApp(RT_FIREBASE_CONFIG, 'runoff-triangle-lab');
     const auth = getAuth(app);
     fb = { db: getFirestore(app), doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp };
 
-    onAuthStateChanged(auth, account => {
+    onAuthStateChanged(auth, async account => {
       if(!account) return;
       fbUid = account.uid;
       host.textContent = 'connecting…';
+      
+      try {
+        const snap = await fb.getDoc(fb.doc(fb.db, 'leaderboards', 'runoff-triangle-lab', 'entries', fbUid));
+        if (snap.exists()) {
+          const data = snap.data();
+          quizState.score.correct = data.score || 0;
+          quizState.score.total = data.total || 0;
+          quizState.streak = data.streak || 0;
+          quizState.bestStreak = data.bestStreak || 0;
+          document.getElementById('scoreBadge').textContent = `Score: ${quizState.score.correct} / ${quizState.score.total}`;
+          document.getElementById('streakBadge').textContent = `Streak: ${quizState.streak}`;
+          document.getElementById('bestStreakBadge').textContent = `Best: ${quizState.bestStreak}`;
+        }
+      } catch(err) { 
+        console.warn('Could not load previous progress:', err); 
+      }
+
+      // Sync to cloud ONLY AFTER attempting to load existing data
       syncToCloud();
 
       if(rtLeaderboardUnsub) rtLeaderboardUnsub();
@@ -1674,16 +1663,18 @@ async function initFirebase(){
       );
     });
 
+    // Don't forget to actually sign them in!
     signInAnonymously(auth).catch(err => {
       console.warn('Anonymous sign-in failed:', err);
       host.textContent = 'Leaderboard unavailable right now.';
     });
+
   } catch(err){
     console.warn('Firebase init failed:', err);
     host.textContent = 'Leaderboard unavailable right now.';
   }
 }
-
+  
 function promptForName(force){
   if(quizState.playerName && !force) return quizState.playerName;
   const name = prompt('What should we call you on the leaderboard?', quizState.playerName || '');
