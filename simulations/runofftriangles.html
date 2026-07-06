@@ -245,7 +245,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDgkPIFlgsZfkt1oWaHZPPUNPotRzGHROs",
@@ -277,18 +277,34 @@
     window.firebaseHelpers = { doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp };
 
     window.firebaseReady = new Promise((resolve) => {
-        onAuthStateChanged(auth, (account) => {
-            if (account) {
-                window.firebaseUid = account.uid;
-                resolve(account.uid);
-            }
-        });
-        signInAnonymously(auth).catch((e) => {
-            console.warn("Anonymous sign-in failed:", e);
-            resolve(null);
-        });
-    });
-</script>
+onAuthStateChanged(auth, async account => {
+  if(!account) return;
+  fbUid = account.uid;
+  host.textContent = 'connecting…';
+
+  // Load whatever was already saved for this user BEFORE writing anything back —
+  // this is what stops the page from wiping your progress on every refresh.
+  try {
+    const snap = await fb.getDoc(fb.doc(fb.db, 'leaderboards', 'runoff-triangle-lab', 'entries', fbUid));
+    if (snap.exists()) {
+      const data = snap.data();
+      quizState.score.correct = data.score || 0;
+      quizState.score.total = data.total || 0;
+      quizState.streak = data.streak || 0;
+      quizState.bestStreak = data.bestStreak || 0;
+      document.getElementById('scoreBadge').textContent = `Score: ${quizState.score.correct} / ${quizState.score.total}`;
+      document.getElementById('streakBadge').textContent = `Streak: ${quizState.streak}`;
+      document.getElementById('bestStreakBadge').textContent = `Best: ${quizState.bestStreak}`;
+    }
+  } catch(e) { console.warn('Could not load previous progress:', e); }
+
+  if(rtLeaderboardUnsub) rtLeaderboardUnsub();
+  rtLeaderboardUnsub = fb.onSnapshot(
+    fb.query(fb.collection(fb.db, 'leaderboards', 'runoff-triangle-lab', 'entries'), fb.orderBy('bestStreak', 'desc'), fb.limit(10)),
+    snap => renderLeaderboard(snap.docs.map(d => ({ ...d.data(), __uid: d.id }))),
+    err => { console.warn('Leaderboard read failed:', err); host.textContent = 'Leaderboard unavailable right now.'; }
+  );
+});</script>
 </head>
 <body>
 
@@ -1642,7 +1658,7 @@ async function initFirebase(){
     // so this never collides with any other Firebase app initialized on the page.
     const app = initializeApp(RT_FIREBASE_CONFIG, 'runoff-triangle-lab');
     const auth = getAuth(app);
-    fb = { db: getFirestore(app), doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp };
+    fb = { db: getFirestore(app), doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp };
 
     onAuthStateChanged(auth, account => {
       if(!account) return;
