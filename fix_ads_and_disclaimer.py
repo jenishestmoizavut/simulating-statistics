@@ -118,7 +118,7 @@ def process(path):
     content = strip_all(content, DISCLAIMER_MARKER)
     content = strip_all(content, FOOTER_LINK_MARKER)
 
-    insertion = f"{BANNER_BLOCK}\n{DISCLAIMER_BLOCK}\n{DISCLAIMER_BLOCK}\n</body>"
+    insertion = f"{BANNER_BLOCK}\n{DISCLAIMER_BLOCK}\n{FOOTER_LINK_BLOCK}\n</body>"
     content = content.replace("</body>", insertion, 1)
 
     if content != original:
