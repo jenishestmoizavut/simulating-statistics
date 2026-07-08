@@ -27,7 +27,7 @@ USAGE:
 """
 
 import os
-
+import re
 ROOT_DIR = "."
 
 # Paste the FULL snippet Adsterra gives you for the 320x50 Banner unit here.
@@ -50,15 +50,19 @@ SKIP_DIRS = {".git", "node_modules", ".github", "_site"}
 # The wrapper pins the banner to the bottom of the screen, centered,
 # above everything else, with a small backdrop so it doesn't look broken
 # on pages with light or dark backgrounds.
+# In your banner script, replace WRAPPER_TEMPLATE with this:
+
 WRAPPER_TEMPLATE = """<!-- {marker} -->
 <div style="position:fixed;left:0;right:0;bottom:0;z-index:9999;
 display:flex;justify-content:center;align-items:center;
 width:320px;height:50px;margin:0 auto;background:rgba(0,0,0,0.85);">
+<span style="position:absolute;top:-13px;left:0;font-size:9px;
+font-family:sans-serif;color:#aaa;background:#111;
+padding:1px 5px;border-radius:2px 2px 0 0;letter-spacing:0.5px;">Ad</span>
 {snippet}
 </div>
 <!-- END {marker} -->
 </body>"""
-
 
 def find_html_files(root):
     found = []
@@ -74,18 +78,26 @@ def inject(path):
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
 
-    if MARKER in content:
-        return "already-has-banner"
+    wrapper = WRAPPER_TEMPLATE.format(marker=MARKER, snippet=AD_SNIPPET)
+
+    pattern = re.compile(
+        rf"<!-- {re.escape(MARKER)} -->.*?<!-- END {re.escape(MARKER)} -->\s*</body>",
+        re.DOTALL
+    )
+
+    if pattern.search(content):
+        new_content = pattern.sub(wrapper, content, count=1)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        return "replaced"
+
     if "</body>" not in content:
         return "no-body-tag"
 
-    wrapper = WRAPPER_TEMPLATE.format(marker=MARKER, snippet=AD_SNIPPET)
     new_content = content.replace("</body>", wrapper, 1)
-
     with open(path, "w", encoding="utf-8") as f:
         f.write(new_content)
     return "updated"
-
 
 def main():
     if "PASTE YOUR REAL ADSTERRA" in AD_SNIPPET:
@@ -102,8 +114,8 @@ def main():
     updated, skipped_existing, skipped_no_body = 0, 0, 0
     for path in all_html:
         result = inject(path)
-        if result == "updated":
-            print(f"updated:  {path}")
+        if result in ("updated", "replaced"):
+            print(f"{result}:  {path}")
             updated += 1
         elif result == "already-has-banner":
             print(f"skip (already has it): {path}")
@@ -111,7 +123,6 @@ def main():
         elif result == "no-body-tag":
             print(f"skip (no </body> found): {path}")
             skipped_no_body += 1
-
     print(f"\nDone. {updated} updated, {skipped_existing} already had it, "
           f"{skipped_no_body} skipped (no </body> tag).")
 

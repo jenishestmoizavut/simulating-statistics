@@ -23,29 +23,34 @@ import os
 import re
 
 ROOT_DIR = "."
-
-DISCLAIMER_TEXT = (
-    'Ads on this site are served by AdSterra and are not personally endorsed by the site owner. '
-    'The site owner is not liable for ad content. '
-    '<a href="https://jenishestmoizavut.github.io/simulating-statistics/disclaimer.html" '
-    'style="color:#8ab4f8;text-decoration:underline;">Read full disclaimer</a>'
-)
-
 MARKER = "ADSTERRA-DISCLAIMER-INJECTED"
 SKIP_DIRS = {".git", "node_modules", ".github", "_site"}
+DISCLAIMER_TEXT = (
+    'Ads are served by AdSterra and not personally endorsed. Not liable for ad content. '
+    '<a href="https://jenishestmoizavut.github.io/simulating-statistics/disclaimer.html" '
+    'style="color:#8ab4f8;text-decoration:underline;">Full disclaimer</a>'
+)
 
-# Slimmer, subtler bar: smaller text, tighter padding, a faint top border
-# to separate it from page content, and the link styled to stand out
-# without shouting. Still sits just above the 50px banner.
 WRAPPER_TEMPLATE = """<!-- {marker} -->
-<div style="position:fixed;left:0;right:0;bottom:50px;z-index:9998;
-text-align:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif;
-font-size:10px;line-height:1.5;letter-spacing:0.1px;
-color:#9a9a9a;background:rgba(15,15,15,0.92);
-border-top:1px solid rgba(255,255,255,0.08);
-padding:3px 10px;">
-{text}
+<div id="adsterra-disclaimer" style="position:fixed;left:0;right:0;bottom:50px;z-index:9998;
+display:flex;align-items:center;justify-content:center;gap:8px;
+font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:10px;
+line-height:1.4;color:#9a9a9a;background:rgba(15,15,15,0.92);
+border-top:1px solid rgba(255,255,255,0.08);padding:3px 28px 3px 10px;">
+<span>{text}</span>
+<button onclick="document.getElementById('adsterra-disclaimer').style.display='none';
+localStorage.setItem('adsterraDisclaimerDismissed','1');"
+style="position:absolute;right:6px;background:none;border:none;color:#888;
+font-size:13px;cursor:pointer;line-height:1;padding:2px 4px;">✕</button>
 </div>
+<script>
+if (localStorage.getItem('adsterraDisclaimerDismissed') === '1') {{
+  document.addEventListener('DOMContentLoaded', function() {{
+    var el = document.getElementById('adsterra-disclaimer');
+    if (el) el.style.display = 'none';
+  }});
+}}
+</script>
 <!-- END {marker} -->
 </body>"""
 
