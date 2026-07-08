@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
 """
-Adds a small disclaimer footer to every page of the site, noting that
-the ads are served by AdSterra, are not personally endorsed, and that
+Adds/updates a small disclaimer footer to every page of the site, noting
+that ads are served by AdSterra, are not personally endorsed, and that
 you (the site owner) should not be held liable for their content.
 
 USAGE:
-1. Clone your repo (if you haven't already):
-   git clone https://github.com/jenishestmoizavut/simulating-statistics.git
+1. cd into your repo (root, not simulations/):
    cd simulating-statistics
 
-2. Adjust DISCLAIMER_TEXT below if you want to reword it.
+2. Adjust DISCLAIMER_TEXT / styling below if you want to tweak it.
 
-3. Put this script in the repo root and run:
-   python add_disclaimer_footer.py
+3. Run:
+   python add_footer_to_ads.py
 
-4. Check with `git diff`, open a couple of pages locally to eyeball it,
-   then:
+4. Check with `git diff --stat`, eyeball a page or two locally, then:
    git add -A
-   git commit -m "Add AdSterra disclaimer footer to all pages"
+   git commit -m "Restyle AdSterra disclaimer footer + fix disclaimer link"
    git push
 """
 
@@ -27,21 +25,25 @@ import re
 ROOT_DIR = "."
 
 DISCLAIMER_TEXT = (
-    "Ads on this site are served by AdSterra and are not personally "
-    "endorsed by the site owner. The site owner is not responsible or "
-    "liable for the content of any ads shown. Read the full at https://jenishestmoizavut.github.io/attrack/disclaimer.html"
+    'Ads on this site are served by AdSterra and are not personally endorsed by the site owner. '
+    'The site owner is not liable for ad content. '
+    '<a href="https://jenishestmoizavut.github.io/simulating-statistics/disclaimer.html" '
+    'style="color:#8ab4f8;text-decoration:underline;">Read full disclaimer</a>'
 )
 
 MARKER = "ADSTERRA-DISCLAIMER-INJECTED"
 SKIP_DIRS = {".git", "node_modules", ".github", "_site"}
 
-# This footer sits above the fixed banner (which is 50px tall), so it
-# doesn't get covered by it. Adjust bottom offset if you change the
-# banner height.
+# Slimmer, subtler bar: smaller text, tighter padding, a faint top border
+# to separate it from page content, and the link styled to stand out
+# without shouting. Still sits just above the 50px banner.
 WRAPPER_TEMPLATE = """<!-- {marker} -->
 <div style="position:fixed;left:0;right:0;bottom:50px;z-index:9998;
-text-align:center;font-family:sans-serif;font-size:11px;line-height:1.4;
-color:#ccc;background:rgba(0,0,0,0.7);padding:4px 8px;">
+text-align:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif;
+font-size:10px;line-height:1.5;letter-spacing:0.1px;
+color:#9a9a9a;background:rgba(15,15,15,0.92);
+border-top:1px solid rgba(255,255,255,0.08);
+padding:3px 10px;">
 {text}
 </div>
 <!-- END {marker} -->
@@ -64,8 +66,6 @@ def inject(path):
 
     wrapper = WRAPPER_TEMPLATE.format(marker=MARKER, text=DISCLAIMER_TEXT)
 
-    # Pattern matches everything from the opening marker comment
-    # through the closing marker comment + </body>
     pattern = re.compile(
         rf"<!-- {re.escape(MARKER)} -->.*?<!-- END {re.escape(MARKER)} -->\s*</body>",
         re.DOTALL
@@ -84,6 +84,7 @@ def inject(path):
     with open(path, "w", encoding="utf-8") as f:
         f.write(new_content)
     return "updated"
+
 
 def main():
     all_html = find_html_files(ROOT_DIR)
@@ -105,7 +106,7 @@ def main():
             print(f"skip (no </body> found): {path}")
             skipped_no_body += 1
 
-    print(f"\nDone. {updated} updated, {skipped_existing} already had it, "
+    print(f"\nDone. {updated} updated/replaced, {skipped_existing} already had it, "
           f"{skipped_no_body} skipped (no </body> tag).")
 
 
