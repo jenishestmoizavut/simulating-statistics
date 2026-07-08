@@ -77,7 +77,15 @@ if (localStorage.getItem('adsterraDisclaimerDismissed') === '1') {{
 }}
 </script>
 <!-- END {DISCLAIMER_MARKER} -->"""
+FOOTER_LINK_MARKER = "ADSTERRA-FOOTER-LINK-INJECTED"
 
+FOOTER_LINK_BLOCK = f"""<!-- {FOOTER_LINK_MARKER} -->
+<div style="text-align:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif;
+font-size:10px;color:#666;padding:16px 10px 70px;">
+<a href="https://jenishestmoizavut.github.io/simulating-statistics/disclaimer.html"
+style="color:#666;text-decoration:underline;">Ad Disclaimer</a>
+</div>
+<!-- END {FOOTER_LINK_MARKER} -->"""
 
 def find_html_files(root):
     found = []
@@ -108,8 +116,9 @@ def process(path):
     original = content
     content = strip_all(content, BANNER_MARKER)
     content = strip_all(content, DISCLAIMER_MARKER)
+    content = strip_all(content, FOOTER_LINK_MARKER)
 
-    insertion = f"{BANNER_BLOCK}\n{DISCLAIMER_BLOCK}\n</body>"
+    insertion = f"{BANNER_BLOCK}\n{DISCLAIMER_BLOCK}\n{DISCLAIMER_BLOCK}\n</body>"
     content = content.replace("</body>", insertion, 1)
 
     if content != original:
