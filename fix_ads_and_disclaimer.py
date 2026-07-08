@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cleans up ANY existing AdSterra banner/disclaimer blocks (including old
+Cleans up ANY existing ads banner/disclaimer blocks (including old
 duplicates) and re-inserts exactly one fresh copy of each, right before
 </body>, on every HTML page.
 
@@ -23,8 +23,8 @@ import re
 ROOT_DIR = "."
 SKIP_DIRS = {".git", "node_modules", ".github", "_site"}
 
-BANNER_MARKER = "ADSTERRA-BANNER-INJECTED"
-DISCLAIMER_MARKER = "ADSTERRA-DISCLAIMER-INJECTED"
+BANNER_MARKER = "AD-BANNER-INJECTED"
+DISCLAIMER_MARKER = "AD-DISCLAIMER-INJECTED"
 
 AD_SNIPPET = """
 <script>
@@ -45,7 +45,7 @@ AD_SNIPPET = """
 <div id="atContainer-00244a2b0b21b7020f7519a5319093fa"></div>
 """
 DISCLAIMER_TEXT = (
-    'Ads are served by AdSterra and not personally endorsed. Not liable for ad content. '
+    'Ads are served by ads and not personally endorsed. Not liable for ad content. '
     '<a href="https://jenishestmoizavut.github.io/simulating-statistics/disclaimer.html" '
     'style="color:#8ab4f8;text-decoration:underline;">Full disclaimer</a>'
 )
@@ -82,7 +82,7 @@ if (localStorage.getItem('adsDisclaimerDismissed') === '1') {{
 }}
 </script>
 <!-- END {DISCLAIMER_MARKER} -->"""
-FOOTER_LINK_MARKER = "ADSTERRA-FOOTER-LINK-INJECTED"
+FOOTER_LINK_MARKER = "ads-FOOTER-LINK-INJECTED"
 
 FOOTER_LINK_BLOCK = f"""<!-- {FOOTER_LINK_MARKER} -->
 <div style="text-align:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif;
