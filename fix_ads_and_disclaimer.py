@@ -28,17 +28,22 @@ DISCLAIMER_MARKER = "ADSTERRA-DISCLAIMER-INJECTED"
 
 AD_SNIPPET = """
 <script>
-  atOptions = {
-    'key' : '00244a2b0b21b7020f7519a5319093fa',
-    'format' : 'iframe',
-    'height' : 50,
-    'width' : 320,
-    'params' : {}
-  };
+  if (typeof atAsyncOptions !== 'object') var atAsyncOptions = [];
+  atAsyncOptions.push({
+    key: '00244a2b0b21b7020f7519a5319093fa',
+    format: 'js',
+    async: true,
+    container: 'atContainer-00244a2b0b21b7020f7519a5319093fa',
+    params: {},
+  });
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.async = true;
+  script.src = 'https://www.highperformanceformat.com/00244a2b0b21b7020f7519a5319093fa/invoke.js';
+  document.getElementsByTagName('head')[0].appendChild(script);
 </script>
-<script src="https://www.highperformanceformat.com/00244a2b0b21b7020f7519a5319093fa/invoke.js"></script>
+<div id="atContainer-00244a2b0b21b7020f7519a5319093fa"></div>
 """
-
 DISCLAIMER_TEXT = (
     'Ads are served by AdSterra and not personally endorsed. Not liable for ad content. '
     '<a href="https://jenishestmoizavut.github.io/simulating-statistics/disclaimer.html" '
@@ -57,21 +62,21 @@ padding:1px 5px;border-radius:2px 2px 0 0;letter-spacing:0.5px;">Ad</span>
 <!-- END {BANNER_MARKER} -->"""
 
 DISCLAIMER_BLOCK = f"""<!-- {DISCLAIMER_MARKER} -->
-<div id="adsterra-disclaimer" style="position:fixed;left:0;right:0;bottom:50px;z-index:9998;
+<div id="ads-disclaimer" style="position:fixed;left:0;right:0;bottom:50px;z-index:9998;
 display:flex;align-items:center;justify-content:center;gap:8px;
 font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:10px;
 line-height:1.4;color:#9a9a9a;background:rgba(15,15,15,0.92);
 border-top:1px solid rgba(255,255,255,0.08);padding:3px 28px 3px 10px;">
 <span>{DISCLAIMER_TEXT}</span>
-<button onclick="document.getElementById('adsterra-disclaimer').style.display='none';
-localStorage.setItem('adsterraDisclaimerDismissed','1');"
+<button onclick="document.getElementById('ads-disclaimer').style.display='none';
+localStorage.setItem('adsDisclaimerDismissed','1');"
 style="position:absolute;right:6px;background:none;border:none;color:#888;
 font-size:13px;cursor:pointer;line-height:1;padding:2px 4px;">&#10005;</button>
 </div>
 <script>
-if (localStorage.getItem('adsterraDisclaimerDismissed') === '1') {{
+if (localStorage.getItem('adsDisclaimerDismissed') === '1') {{
   document.addEventListener('DOMContentLoaded', function() {{
-    var el = document.getElementById('adsterra-disclaimer');
+    var el = document.getElementById('ads-disclaimer');
     if (el) el.style.display = 'none';
   }});
 }}
