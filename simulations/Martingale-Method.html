@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="robots" content="index, follow">
+<meta name="description" content="The martingale (5-step) method for pricing derivatives, explained visually: how a portfolio of shares and cash can replicate any payoff, step by step.">
+<link rel="canonical" href="https://jenishestmoizavut.github.io/simulating-statistics/simulations/Martingale-Method.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://jenishestmoizavut.github.io/simulating-statistics/simulations/Martingale-Method.html">
+<meta property="og:title" content="The Martingale Method | Simulating Statistics">
+<meta property="og:description" content="How five steps turn shares and cash into a perfect replica of any derivative's payoff — visually, interactively.">
+<meta property="og:image" content="https://jenishestmoizavut.github.io/simulating-statistics/simulating-statistics.png">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Martingale Method | Simulating Statistics</title>
+    <link rel="icon" href="../favicon.ico">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --panel: rgba(0,0,0,0.22);
+            --text: #f8fafc;
+            --subtext: #94a3b8;
+            --rule: rgba(255,255,255,0.08);
+            --accent: #34d399;        /* emerald */
+            --accent-glow: rgba(52, 211, 153, 0.4);
+            --accent2: #fb7185;       /* rose */
+            --accent2-glow: rgba(251, 113, 133, 0.4);
+            --track: #334155;
+            --radius: 14px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at 50% 0%, rgba(52,211,153,0.05), transparent 60%);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        a { color: var(--accent); }
+
+        /* ---------- Standardized Header (from runofftriangles) ---------- */
+        header.top {
+            background: var(--card);
+            color: var(--text);
+            padding: 20px 0 18px;
+            margin-bottom: 26px;
+            border-bottom: 1px solid var(--rule);
+            width: 100%;
+        }
+        header.top .wrap {
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 14px; max-width: 1200px; margin: 0 auto; padding: 0 20px;
+        }
+        header.top h1 {
+            font-family: 'Inter', sans-serif; font-weight: 800; font-size: 26px;
+            margin: 0 0 4px; letter-spacing: -0.01em;
+        }
+        header.top .subtitle {
+            font-family: 'Inter', sans-serif; font-size: 13.5px;
+            color: var(--subtext); margin: 0; font-weight: 400;
+        }
+
+        /* ---------- Left Sidebar Layout ---------- */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            gap: 30px;
+            align-items: start;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px 60px;
+            flex: 1;
+        }
+        @media (max-width: 850px) {
+            .main-layout { grid-template-columns: 1fr; }
+            .sidebar { position: static !important; flex-direction: row !important; overflow-x: auto; padding-bottom: 10px; }
+            .sidebar a { white-space: nowrap; }
+        }
+
+        .sidebar {
+            position: sticky; top: 20px;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .sidebar a {
+            padding: 10px 14px; border-radius: 8px; color: var(--subtext); text-decoration: none;
+            font-size: 0.9rem; font-weight: 600; border: 1px solid transparent; transition: all 0.2s;
+        }
+        .sidebar a:hover, .sidebar a.active {
+            background: var(--panel); color: var(--accent); border-color: rgba(255,255,255,0.05);
+        }
+
+        /* ---------- panel / card system ---------- */
+        .panel {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 30px 32px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            border: 1px solid var(--rule);
+            margin-bottom: 26px;
+            scroll-margin-top: 20px;
+        }
+        @media (max-width:640px){ .panel{ padding:22px 20px; } }
+        .panel h2 { margin: 0 0 6px; font-weight: 800; letter-spacing: -0.02em; font-size: 1.5rem; }
+        .panel .tagline { color: var(--subtext); font-size: 0.95rem; margin: 0 0 22px; max-width: 620px; line-height: 1.6; }
+        .section-label {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; text-transform: uppercase;
+            letter-spacing: 0.1em; color: var(--accent); margin-bottom: 8px; display:block;
+        }
+
+        .subpanel {
+            background: var(--panel);
+            border-radius: 12px;
+            padding: 18px 20px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* ---------- hero balance ---------- */
+        .hero-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 30px; align-items: center; }
+        @media (max-width: 760px){ .hero-grid{ grid-template-columns: 1fr; } }
+        .scale-wrap { width: 100%; aspect-ratio: 1/0.85; }
+        .scale-wrap svg { width:100%; height:100%; overflow:visible; }
+        .beam { transform-origin: 200px 90px; animation: sway 5s ease-in-out infinite; }
+        @keyframes sway { 0%,100%{ transform:rotate(-1.6deg);} 50%{ transform:rotate(1.6deg);} }
+        .glow-pulse { animation: pulseGlow 2.6s ease-in-out infinite; }
+        @keyframes pulseGlow {
+            0%,100%{ filter:drop-shadow(0 0 0px var(--accent-glow)); }
+            50%{ filter:drop-shadow(0 0 9px var(--accent-glow)); }
+        }
+
+        /* ---------- building block grid ---------- */
+        .block-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+        @media (max-width:640px){ .block-grid{ grid-template-columns:1fr; } }
+        .block-card {
+            background: var(--panel); border-radius: 12px; padding: 18px 20px;
+            border: 1px solid rgba(255,255,255,0.05); border-left: 3px solid var(--accent);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .block-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        .block-card.rose { border-left-color: var(--accent2); }
+        
+        .block-card .tag {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
+            color: var(--subtext); display: block; margin-bottom: 8px;
+        }
+        .block-card h3 { margin: 0 0 6px; font-size: 1.02rem; font-weight: 700; }
+        .block-card p { margin: 0; color: var(--subtext); font-size: 0.88rem; line-height: 1.55; }
+
+        /* ---------- engines ---------- */
+        .engine { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: center; }
+        @media (max-width: 720px){ .engine{ grid-template-columns: 1fr; } }
+        .engine + .engine { margin-top: 16px; }
+        .engine p { color: var(--subtext); font-size: 0.9rem; margin: 0; line-height: 1.6; }
+        .engine h3 { font-size: 1rem; margin: 0 0 8px; font-weight: 700; }
+        .eq-box { display:flex; align-items:center; justify-content:center; }
+
+        /* ---------- equation cards ---------- */
+        .eqcard {
+            background: var(--panel); border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px; padding: 18px 20px; overflow-x: auto;
+        }
+        .eqcard .katex { font-size: 1.05em; color: var(--text); }
+        .glow-term { transition: text-shadow .4s ease; }
+        .flash .glow-term { animation: termFlash 1.4s ease; }
+        @keyframes termFlash { 0% { text-shadow: 0 0 0px var(--accent-glow); } 25% { text-shadow: 0 0 12px var(--accent-glow); } 100% { text-shadow: 0 0 0px var(--accent-glow); } }
+
+        /* ---------- stepper ---------- */
+        .step-dots { display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
+        .dot {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--subtext);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; padding: 6px 14px;
+            background: var(--panel); cursor: pointer; transition: all .2s ease; font-weight: 600;
+        }
+        .dot.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+        .dot:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+        .step-inner { background: var(--panel); border-radius: 14px; padding: 24px 26px; border: 1px solid rgba(255,255,255,0.05); }
+        .step-kicker { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--accent); letter-spacing: 0.08em; margin-bottom: 6px; }
+        .step-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 10px; }
+        .step-body p { font-size: 0.92rem; color: var(--subtext); line-height: 1.65; margin: 0 0 16px; }
+        .step-eqs { display: flex; flex-direction: column; gap: 12px; }
+
+        .step-nav { display: flex; justify-content: space-between; margin-top: 20px; }
+        button.navbtn {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 600; color: var(--text);
+            background: var(--panel); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+            padding: 10px 18px; cursor: pointer; transition: all 0.2s ease;
+        }
+        button.navbtn:hover:not(:disabled) { background: var(--accent); color: var(--bg); transform: translateY(-2px); box-shadow: 0 4px 12px var(--accent-glow); }
+        button.navbtn:disabled { opacity: 0.35; cursor: not-allowed; }
+/* ---------- accordion steps ---------- */
+        .accordion-step {
+            background: var(--panel); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px; margin-bottom: 12px; overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .accordion-header {
+            padding: 18px 22px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+            background: rgba(255,255,255,0.01); transition: background 0.2s ease;
+        }
+        .accordion-header:hover { background: rgba(255,255,255,0.04); }
+        
+        .accordion-step.active {
+            border-color: var(--accent);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+        }
+        .accordion-step.active .accordion-header {
+            background: rgba(52, 211, 153, 0.08); /* Faint emerald tint when open */
+        }
+        
+        .step-num { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-size: 0.75rem; font-weight: 700; margin-right: 14px; letter-spacing: 0.05em; }
+        .step-name { font-weight: 700; color: var(--text); font-size: 1.05rem; }
+        .step-icon { font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; color: var(--subtext); transition: transform 0.3s ease; }
+        .accordion-step.active .step-icon { color: var(--accent); transform: rotate(45deg); } /* Turns + into an x */
+
+        .accordion-content {
+            max-height: 0; padding: 0 22px; opacity: 0; transition: all 0.4s ease-in-out;
+            visibility: hidden;
+        }
+        .accordion-step.active .accordion-content {
+            max-height: 800px; padding: 0 22px 22px; opacity: 1;
+            visibility: visible;
+        }
+        .step-body p { font-size: 0.92rem; color: var(--subtext); line-height: 1.65; margin: 0 0 16px; }
+        .step-eqs { display: flex; flex-direction: column; gap: 12px; }
+
+        /* Each equation line inside a step starts hidden, and fades/slides in
+           one at a time as the step is expanded — so new lines visibly "drop in".
+           The reveal applies to the whole note+equation block, not just the equation. */
+        .step-eqs .eq-block {
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.45s ease, transform 0.45s ease;
+            display: flex; flex-direction: column; gap: 7px;
+        }
+        .step-eqs .eq-block.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .eq-note {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--subtext);
+            padding-left: 2px;
+            line-height: 1.5;
+        }
+        .eq-note strong {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        /* ---------- delta demo ---------- */
+        .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: center; }
+        @media (max-width:720px){ .demo-grid{ grid-template-columns: 1fr; } }
+        .slider-row { margin-bottom: 18px; }
+        .slider-row label {
+            display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--subtext); margin-bottom: 8px; font-weight: 600;
+        }
+        .slider-row output { color: var(--accent); text-transform: none; letter-spacing: 0; font-weight: 700; }
+        
+        input[type=range] { width: 100%; -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; background: var(--bg); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%;
+            background: var(--accent); margin-top: -7px; cursor: pointer;
+            box-shadow: 0 0 10px var(--accent-glow); transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:active { transform: scale(1.15); }
+        input[type=range]::-moz-range-track { height: 6px; background: var(--bg); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; }
+        input[type=range]::-moz-range-thumb {
+            height: 18px; width: 18px; border-radius: 50%; background: var(--accent); border: none;
+            box-shadow: 0 0 10px var(--accent-glow); cursor: pointer; transition: transform 0.1s;
+        }
+
+        .readout { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 4px; }
+        .readout .cell { background: var(--panel); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px 8px; text-align: center; }
+        .readout .cell .k { font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--subtext); display:block; margin-bottom: 4px; }
+        .readout .cell .v { font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; color: var(--text); font-weight: 700; }
+
+        .balancebar { margin-top: 18px; }
+        .bar-track { display: flex; height: 30px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); }
+        .bar-teal { background: var(--accent); transition: width .3s ease; }
+        .bar-rose { background: var(--accent2); transition: width .3s ease; }
+        .bar-v { height: 30px; border-radius: 8px; background: linear-gradient(90deg, var(--accent), var(--accent2)); margin-top: 8px; transition: width .3s ease; display:flex; align-items:center; padding-left: 10px; }
+        .bar-v span { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--bg); font-weight: 700; }
+        .bar-legend { display:flex; gap: 18px; margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--subtext); flex-wrap: wrap; }
+        .bar-legend .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+        .small-note { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--subtext); margin-top: 10px; }
+
+        /* ---------- dividend toggle ---------- */
+        .toggle-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+        .switch { position: relative; width: 42px; height: 23px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider-pill { position: absolute; inset: 0; background: var(--track); border-radius: 999px; cursor: pointer; transition: .25s; }
+        .slider-pill::before { content: ""; position: absolute; width: 17px; height: 17px; left: 3px; top: 3px; background: var(--subtext); border-radius: 50%; transition: .25s; }
+        .switch input:checked + .slider-pill { background: var(--accent2-glow); }
+        .switch input:checked + .slider-pill::before { transform: translateX(19px); background: var(--accent2); }
+        .toggle-label { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--subtext); font-weight: 600; }
+        .div-panel { display: none; }
+        .div-panel.show { display: block; }
+
+        /* ---------- comparison grid ---------- */
+        .cmp-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+        @media (max-width:640px){ .cmp-grid{ grid-template-columns: 1fr; } }
+        .cmp-card { background: var(--panel); border-radius: 12px; padding: 18px 20px; border: 1px solid rgba(255,255,255,0.05); border-top: 3px solid var(--accent); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .cmp-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        .cmp-card.tradeoff { border-top-color: var(--accent2); }
+        .cmp-card h3 { font-size: 0.98rem; margin: 0 0 6px; font-weight: 700; color: var(--text); }
+        .cmp-card p { margin: 0; font-size: 0.86rem; color: var(--subtext); line-height: 1.55; }
+
+        /* ---------- Standardized Footer ---------- */
+        footer { text-align: center; font-size: 12.5px; color: var(--subtext); font-family: 'Inter', sans-serif; padding: 20px 0 20px; border-top: 1px solid var(--rule); margin-top: auto; }
+        footer a { color: var(--accent); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+
+        .inline-eq .katex { font-size: 1em; }
+    </style>
+</head>
+<body>
+
+<header class="top">
+    <div class="wrap">
+        <div>
+            <h1>The Martingale Method</h1>
+            <p class="subtitle">How do you copy a bet you can't place? Shares + cash = the derivative.</p>
+        </div>
+    </div>
+</header>
+
+<div class="main-layout">
+    
+    <aside class="sidebar">
+        <a href="#hero" class="active">The Big Picture</a>
+        <a href="#blocks">Three Core Rules</a>
+        <a href="#measures">Equivalent Measures</a>
+        <a href="#engines">The Engines</a>
+        <a href="#steps">The 5 Steps</a>
+        <a href="#delta">Delta in Action</a>
+        <a href="#dividends">Handling Dividends</a>
+        <a href="#compare">Why use this?</a>
+    </aside>
+
+    <main class="content">
+
+        <section class="panel" id="hero">
+            <div class="hero-grid">
+                <div>
+                    <span class="section-label">The picture to hold in mind</span>
+                    <h2>Shares + cash = the derivative, always</h2>
+                    <p class="tagline" style="margin-bottom:0;">
+                        Here's the picture to keep in your head for everything below: hold
+                        <span class="inline-eq" data-eq="\phi_t"></span> shares and
+                        <span class="inline-eq" data-eq="\psi_t"></span> in cash, keep adjusting the mix
+                        as prices move, and that little portfolio tracks the derivative's value at every
+                        instant. No guessing, no risk, no cash sneaking in from outside. Everything below
+                        is just making that precise.
+                    </p>
+                </div>
+                <div class="scale-wrap" aria-hidden="true">
+                    <svg viewBox="0 0 400 320">
+                        <g class="glow-pulse">
+                            <rect x="140" y="6" width="120" height="38" rx="8" fill="#1e293b" stroke="#34d399" stroke-width="1.2"/>
+                            <text x="200" y="30" text-anchor="middle" fill="#34d399" font-family="'JetBrains Mono',monospace" font-size="12">V(t) = ?</text>
+                        </g>
+                        <rect x="196" y="52" width="8" height="140" fill="#334155"/>
+                        <polygon points="150,192 250,192 235,210 165,210" fill="#334155"/>
+                        <g class="beam">
+                            <rect x="60" y="78" width="280" height="6" rx="3" fill="#334155"/>
+                            <circle cx="200" cy="81" r="7" fill="#94a3b8"/>
+                            <line x1="80" y1="81" x2="80" y2="140" stroke="#334155" stroke-width="2"/>
+                            <line x1="120" y1="81" x2="80" y2="140" stroke="#334155" stroke-width="2"/>
+                            <ellipse cx="100" cy="142" rx="50" ry="9" fill="none" stroke="#334155" stroke-width="2"/>
+                            <rect x="60" y="142" width="80" height="32" rx="6" fill="#0f2b22" stroke="#34d399" stroke-width="1.2"/>
+                            <text x="100" y="163" text-anchor="middle" fill="#34d399" font-family="'JetBrains Mono',monospace" font-size="12">&#966;&#183;S</text>
+                            <line x1="320" y1="81" x2="320" y2="140" stroke="#334155" stroke-width="2"/>
+                            <line x1="280" y1="81" x2="320" y2="140" stroke="#334155" stroke-width="2"/>
+                            <ellipse cx="300" cy="142" rx="50" ry="9" fill="none" stroke="#334155" stroke-width="2"/>
+                            <rect x="260" y="142" width="80" height="32" rx="6" fill="#2b0f18" stroke="#fb7185" stroke-width="1.2"/>
+                            <text x="300" y="163" text-anchor="middle" fill="#fb7185" font-family="'JetBrains Mono',monospace" font-size="12">&#968;&#183;B</text>
+                        </g>
+                        <text x="200" y="240" text-anchor="middle" fill="#94a3b8" font-family="'JetBrains Mono',monospace" font-size="10.5">shares + cash, rebalanced continuously</text>
+                        <text x="200" y="256" text-anchor="middle" fill="#94a3b8" font-family="'JetBrains Mono',monospace" font-size="10.5">always worth exactly V(t)</text>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" id="blocks">
+            <span class="section-label">Before the proof</span>
+            <h2>Three ideas you need in your pocket</h2>
+            <p class="tagline">Before we touch the proof itself, get comfortable with three
+                requirements a trading strategy has to satisfy. They sound almost too simple to
+                matter — but once they click, the five-step proof is really just bookkeeping.</p>
+
+            <div class="block-grid">
+                <div class="block-card">
+                    <span class="tag">Rule 1</span>
+                    <h3>No peeking at the future</h3>
+                    <p>A strategy is <strong>previsible</strong> if you decided how much to hold at
+                        time t using only what you knew before t. It's like placing your bet the
+                        instant before the number is called, not after you've already seen it land.</p>
+                </div>
+                <div class="block-card rose">
+                    <span class="tag">Rule 2</span>
+                    <h3>No money sneaks in or out</h3>
+                    <p>Self-financing just means you're not cheating. Once the strategy starts, you
+                        don't add outside cash and you don't quietly pull any out — every bit of
+                        movement in the portfolio has to come from the market itself.</p>
+                </div>
+                <div class="block-card">
+                    <span class="tag">Rule 3</span>
+                    <h3>Same bill, every time</h3>
+                    <p>A strategy <strong>replicates</strong> a derivative if it hands over exactly
+                        the payoff that was promised at the end. Not roughly, not on average across a
+                        few tries — exactly, every single time.</p>
+                </div>
+                <div class="block-card rose">
+                    <span class="tag">Consequence</span>
+                    <h3>A complete market</h3>
+                    <p>Put those three together for every possible payoff, and you've got a
+                        <strong>complete market</strong> — one where every derivative has exactly one
+                        price that doesn't leave an arbitrage sitting around for someone to grab.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" id="measures">
+            <span class="section-label">A definition worth pinning down</span>
+            <h2>Equivalent measures: same possible, different likely</h2>
+            <p class="tagline">Before the two engines can do their work, we need to be precise
+                about what "changing probabilities" is allowed to mean. This is the definition
+                every result below leans on.</p>
+
+            <div class="subpanel">
+                <p style="margin:0 0 14px;color:var(--subtext);font-size:0.9rem;line-height:1.65;">
+                    Two measures P and P&prime; are <strong>equivalent</strong> — written
+                    P&prime; &sim; P — if they agree on which outcomes are possible, even when
+                    they disagree on how likely those outcomes are:
+                </p>
+                <div class="eqcard" id="eq-equivdef"></div>
+                <p class="small-note" style="margin-top:14px;">In words: for every event A,
+                    P&prime; assigns it zero probability exactly when P does too. Anything P calls
+                    impossible, P&prime; also calls impossible, and vice versa — everything else
+                    can be reweighted however you like.</p>
+            </div>
+
+            <p class="tagline" style="margin-top:22px;margin-bottom:14px;">That's exactly why
+                equivalence is awkward to prove directly — checking the definition means checking
+                every event in the sample space lines up. The Cameron&ndash;Martin&ndash;Girsanov
+                theorem below sidesteps that by handing you an explicit Q, instead of asking you
+                to verify the definition from scratch.</p>
+
+            <div class="subpanel">
+                <span class="section-label" style="color:var(--accent2);">A continuous-time warm-up</span>
+                <p style="margin:0 0 14px;color:var(--subtext);font-size:0.9rem;line-height:1.65;">
+                    Let <span class="inline-eq" data-eq="Z_t"></span> be a standard Brownian motion
+                    under P, so <span class="inline-eq" data-eq="Z_t\sim N(0,t)"></span> for all t.
+                    Let <span class="inline-eq" data-eq="X_t=\gamma t+\sigma Z_t"></span> be a
+                    Brownian motion with drift. Is there a measure Q, equivalent to P, under which
+                    <span class="inline-eq" data-eq="X_t"></span> is itself a standard Brownian motion?
+                </p>
+                <div class="eqcard" id="eq-continuous-example"></div>
+                <p class="small-note" style="margin-top:14px;">The answer: yes if &sigma; = 1, no
+                    if &sigma; &ne; 1 (proving that needs the theorem below, so we won't do it
+                    here). That one asymmetry is the whole ballgame: <strong>a change of measure
+                    can move the drift wherever you like, but it can never touch the
+                    volatility.</strong></p>
+            </div>
+        </section>
+
+        <section class="panel" id="engines">
+            <span class="section-label">Two engines the proof runs on</span>
+            <h2>What actually does the heavy lifting</h2>
+            <p class="tagline">Two theorems carry the whole argument. Neither is proved here —
+                both proofs are beyond what this method covers — but you need their exact
+                statements, not just a one-line summary, because the fine print is where the five
+                steps get their power.</p>
+
+            <h3 style="margin:0 0 4px;font-size:1.05rem;">Engine 1 — the Cameron&ndash;Martin&ndash;Girsanov theorem</h3>
+            <p class="tagline" style="margin-top:6px;">This is the theorem that lets us swap the
+                drift of a Brownian motion for a more convenient one, without changing what's
+                possible.</p>
+
+            <div class="engine">
+                <div>
+                    <h3>Forward direction</h3>
+                    <p>Let <span class="inline-eq" data-eq="Z_t"></span> be a standard Brownian
+                        motion under P, and let <span class="inline-eq" data-eq="\gamma_t"></span>
+                        be any previsible process. Then there exists a measure Q, equivalent to P,
+                        under which the shifted process below is itself a standard Brownian
+                        motion.</p>
+                </div>
+                <div class="eq-box"><div class="eqcard" id="eq-girsanov-fwd" style="width:100%;"></div></div>
+            </div>
+
+            <div class="engine">
+                <div>
+                    <h3>Converse direction</h3>
+                    <p>Run it backwards: if <span class="inline-eq" data-eq="Z_t"></span> is a
+                        standard Brownian motion under P and Q is <em>any</em> measure equivalent
+                        to P, some previsible <span class="inline-eq" data-eq="\gamma_t"></span>
+                        must exist that produces exactly that same shift.</p>
+                </div>
+                <div class="eq-box"><div class="eqcard" id="eq-girsanov-conv" style="width:100%;"></div></div>
+            </div>
+
+            <div class="subpanel" style="margin-top:4px;">
+                <p style="margin:0;color:var(--subtext);font-size:0.9rem;line-height:1.65;">Put
+                    the two directions together and you get the fact that Step 1 runs on: <strong>
+                    every equivalent change of measure is a drift shift of exactly this form</strong>
+                    — so it can dial <span class="inline-eq" data-eq="\mu"></span> to anything you
+                    like, but the volatility <span class="inline-eq" data-eq="\sigma"></span> is
+                    untouched by construction.</p>
+            </div>
+
+            <h3 style="margin:28px 0 4px;font-size:1.05rem;">Why we actually need it</h3>
+            <p class="tagline" style="margin-top:6px;margin-bottom:12px;">Here's the concrete
+                problem Girsanov solves. Model the share price as geometric Brownian motion under P:</p>
+            <div class="eqcard" id="eq-gbm" style="margin-bottom:16px;"></div>
+            <p class="tagline" style="margin-bottom:12px;">Discount it and take the expectation
+                under P:</p>
+            <div class="eqcard" id="eq-gbm-expect" style="margin-bottom:16px;"></div>
+            <p class="tagline" style="margin-bottom:0;">That's only a martingale if &mu; = r —
+                and there's no reason a stock's real-world drift should equal the risk-free rate.
+                Pricing needs the discounted price to be driftless, so we use Girsanov to move to
+                a measure Q where it actually is driftless. That's exactly what Step 1 of the
+                five-step method is doing.</p>
+
+            <h3 style="margin:28px 0 4px;font-size:1.05rem;">Engine 1, restated for diffusions</h3>
+            <p class="tagline" style="margin-top:6px;margin-bottom:12px;">Everything above
+                generalises to any diffusion, which is the form Steps 3&ndash;4 actually use.
+                Write the model as an SDE under P:</p>
+            <div class="eqcard" id="eq-diffusion-def" style="margin-bottom:16px;"></div>
+            <p class="tagline" style="margin-bottom:12px;">If <span class="inline-eq" data-eq="X_t"></span>
+                is a martingale under P, its drift term must vanish identically:</p>
+            <div class="eqcard" id="eq-diffusion-nodrift" style="margin-bottom:16px;"></div>
+            <p class="tagline" style="margin-bottom:0;">So "no drift" and "martingale" mean the
+                same thing here — a fact Step 1 leans on directly.</p>
+
+            <h3 style="margin:28px 0 4px;font-size:1.05rem;">Engine 2 — the martingale representation theorem</h3>
+            <p class="tagline" style="margin-top:6px;margin-bottom:12px;">This is the theorem
+                that actually produces the trading strategy in Step 4. Suppose
+                <span class="inline-eq" data-eq="X_t"></span> is a martingale w.r.t. P, meaning
+                for every t &lt; s:</p>
+            <div class="eqcard" id="eq-mart-def" style="margin-bottom:16px;"></div>
+            <p class="tagline" style="margin-bottom:12px;">Suppose <span class="inline-eq" data-eq="Y_t"></span>
+                is another martingale w.r.t. P. The theorem states there exists a previsible
+                process <span class="inline-eq" data-eq="\phi_t"></span> such that:</p>
+            <div class="eqcard" id="eq-mrt" style="margin-bottom:16px;"></div>
+            <p class="tagline" style="margin-bottom:0;"><strong>if and only if there is no other
+                measure equivalent to P under which <span class="inline-eq" data-eq="X_t"></span>
+                is a martingale.</strong> That condition is exactly what "complete market" meant
+                back in the Three Core Rules section — it's why the representation only works when
+                the market has no redundant sources of risk. (The theorem also holds when
+                <span class="inline-eq" data-eq="X_t"></span> is a vector of martingales, i.e.
+                several risky assets at once; the proof itself is beyond what we cover here.)</p>
+
+            <h3 style="margin:28px 0 4px;font-size:1.05rem;">Engine 2, made concrete</h3>
+            <p class="tagline" style="margin-top:6px;margin-bottom:12px;">In the diffusion
+                setting, &phi; isn't just guaranteed to exist — it has a formula. Suppose both X
+                and Y are martingales under P, driven by the same Brownian motion:</p>
+            <div class="eqcard" id="eq-mrt-diffusion" style="margin-bottom:16px;"></div>
+            <p class="tagline" style="margin-bottom:0;">That ratio of volatilities — provided
+                <span class="inline-eq" data-eq="\sigma_X(t,X_t)>0"></span> almost surely — <em>is</em>
+                &phi;. This is exactly the object Step 4 identifies as the number of shares to hold.</p>
+        </section>
+
+        <section class="panel" id="steps">
+        <span class="section-label">The main event</span>
+        <h2>Five moves that build the strategy</h2>
+        <p class="tagline">Go through these one at a time — don't rush step 4, that's where
+            the actual payoff is. Click to expand each step. Each equation line drops in one at a
+            time as you open a step, and the terms that just changed glow so you can see exactly
+            where the argument moves.</p>
+
+        <div class="accordion-container" id="stepsAccordion">
+            </div>
+    </section>
+
+        <section class="panel" id="delta">
+            <span class="section-label">Where the strategy lands</span>
+            <h2>&#966; has a name you already know: Delta</h2>
+            <p class="tagline">
+                Here's a nice payoff for all that work: run the same five steps on an ordinary
+                call option, and <span class="inline-eq" data-eq="\phi_t"></span> just turns out to be
+                <span class="inline-eq" data-eq="\partial V/\partial S"></span> — the Delta traders
+                have been tracking this whole time anyway. Try dragging the share price below and
+                watch the portfolio rebalance itself.
+            </p>
+
+            <div class="demo-grid">
+                <div>
+                    <div class="slider-row">
+                        <label>Share price S <output id="outS">100</output></label>
+                        <input type="range" id="rangeS" min="50" max="160" value="100" step="1">
+                    </div>
+                    <div class="slider-row">
+                        <label>Time remaining T&minus;t (yrs) <output id="outT">1.00</output></label>
+                        <input type="range" id="rangeT" min="0.05" max="2" value="1" step="0.05">
+                    </div>
+                    <div class="slider-row">
+                        <label>Volatility &sigma; <output id="outSig">25%</output></label>
+                        <input type="range" id="rangeSig" min="5" max="60" value="25" step="1">
+                    </div>
+                    <p class="small-note">Strike is fixed at K = 100 and the risk-free rate at r = 5%, so you can isolate one variable at a time.</p>
+                </div>
+                <div>
+                    <div class="readout">
+                        <div class="cell"><span class="k">&#916; = &#966;_t</span><span class="v" id="outDelta">&ndash;</span></div>
+                        <div class="cell"><span class="k">&#968;_t &middot; B</span><span class="v" id="outPsi">&ndash;</span></div>
+                        <div class="cell"><span class="k">V_t</span><span class="v" id="outV">&ndash;</span></div>
+                    </div>
+                    <div class="balancebar">
+                        <div class="bar-track">
+                            <div class="bar-teal" id="barTeal" style="width:60%"></div>
+                            <div class="bar-rose" id="barMul" style="width:40%"></div>
+                        </div>
+                        <div class="bar-v" id="barV" style="width:100%"><span id="barVLabel">V = 0.00</span></div>
+                        <div class="bar-legend">
+                            <span><i class="sw" style="background:var(--accent)"></i>&#966;&#183;S &mdash; shares held</span>
+                            <span><i class="sw" style="background:var(--accent2)"></i>&#968;&#183;B &mdash; cash held</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" id="dividends">
+            <span class="section-label">One extra wrinkle</span>
+            <h2>Dividends swap one asset, not the method</h2>
+            <p class="tagline">One wrinkle worth knowing about: if the share pays a continuous
+                dividend, its raw price isn't quite what you're trading anymore — value keeps
+                leaking out as dividends. The fix is smaller than you'd expect, and it only
+                touches step 1: trade a version of the share with the dividends reinvested, then
+                convert back to real shares right at the end.</p>
+
+            <div class="subpanel">
+                <div class="toggle-row">
+                    <label class="switch">
+                        <input type="checkbox" id="divToggle">
+                        <span class="slider-pill"></span>
+                    </label>
+                    <span class="toggle-label">show the dividend-paying version</span>
+                </div>
+                <div class="div-panel show" id="panelNoDiv">
+                    <div class="eqcard"><div id="eqDivOff"></div></div>
+                    <p class="small-note">Ordinary case — trade the share itself.</p>
+                </div>
+                <div class="div-panel" id="panelDiv">
+                    <div class="eqcard"><div id="eqDivOn"></div></div>
+                    <p class="small-note">Dividend case &mdash; you trade the reinvested version
+                        <span class="inline-eq" data-eq="\tilde S_t"></span> instead, then convert
+                        back with <span class="inline-eq" data-eq="\phi_t = e^{qt}\tilde\phi_t"></span>
+                        to get real shares of <span class="inline-eq" data-eq="S_t"></span>.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" id="compare">
+            <span class="section-label">Why bother with all this</span>
+            <h2>The alternative is guessing</h2>
+            <p class="tagline">Fair question at this point: why go through five steps when
+                there's a shorter route? You could write down a differential equation and guess
+                a solution that fits the boundary conditions instead. Here's honestly how the
+                two compare.</p>
+
+            <div class="cmp-grid">
+                <div class="cmp-card">
+                    <h3>You don't have to guess</h3>
+                    <p>With the differential equation, you propose a solution and then check
+                        that it fits the boundary conditions — that's a real guess. Here, the
+                        price just falls out as an expectation you can compute directly.</p>
+                </div>
+                <div class="cmp-card">
+                    <h3>The hedge comes along for free</h3>
+                    <p>You also don't have to go derive Delta separately afterward. The same
+                        steps that prove the price is right hand you the exact hedge as a
+                        side effect.</p>
+                </div>
+                <div class="cmp-card">
+                    <h3>Handles the awkward payoffs</h3>
+                    <p>Path-dependent payoffs — Asian options and their relatives — are where
+                        this really pays off. They fall out of the same five steps just fine,
+                        while the differential-equation route can genuinely struggle with them.</p>
+                </div>
+                <div class="cmp-card tradeoff">
+                    <h3>But to be fair to the other side</h3>
+                    <p>For a quick, basic hedging argument, guessing a differential equation is
+                        often just faster to state and easier to follow at a glance. This route
+                        takes more setup to get going.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<footer>
+    © 2026 Jenish • <a href="https://jenishestmoizavut.github.io/simulating-statistics/">Simulating Statistics</a> — The Martingale Method
+</footer>
+
+<script>
+/* ---------- active sidebar tracking ---------- */
+const sections = document.querySelectorAll('.panel');
+const navLinks = document.querySelectorAll('.sidebar a');
+
+window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(section => {
+        const sectionTop = section.offsetTop;
+        const sectionHeight = section.clientHeight;
+        if (pageYOffset >= (sectionTop - 100)) {
+            current = section.getAttribute('id');
+        }
+    });
+
+    navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href').includes(current)) {
+            link.classList.add('active');
+        }
+    });
+});
+
+/* ---------- render every static inline equation ---------- */
+document.querySelectorAll('[data-eq]').forEach(el=>{
+  katex.render(el.getAttribute('data-eq'), el, {throwOnError:false});
+});
+
+katex.render(
+  "P' \\sim P \\quad\\Longleftrightarrow\\quad \\big[\\,P'(A)=0 \\iff P(A)=0\\,\\big]\\ \\text{ for every event } A",
+  document.getElementById('eq-equivdef'), {throwOnError:false, displayMode:true}
+);
+katex.render(
+  "Z_t\\sim N(0,t)\\qquad X_t=\\gamma t+\\sigma Z_t\\qquad \\exists\\ Q\\sim P:\\ X_t\\text{ standard BM under }Q\\ ?",
+  document.getElementById('eq-continuous-example'), {throwOnError:false, displayMode:true}
+);
+katex.render(
+  "\\tilde Z_t = Z_t+\\int_0^t \\gamma_s\\,ds \\quad\\text{is a standard Brownian motion under }Q",
+  document.getElementById('eq-girsanov-fwd'), {throwOnError:false, displayMode:true}
+);
+katex.render(
+  "\\exists\\ \\text{previsible }\\gamma_t:\\quad \\tilde Z_t=Z_t+\\int_0^t\\gamma_s\\,ds\\ \\text{ is a standard Brownian motion under }Q",
+  document.getElementById('eq-girsanov-conv'), {throwOnError:false, displayMode:true}
+);
+katex.render(
+  "S_t=S_0\\exp\\!\\Big[\\big(\\mu-\\tfrac12\\sigma^2\\big)t+\\sigma Z_t\\Big]\\qquad(Z_t\\text{ standard BM under }P)",
+  document.getElementById('eq-gbm'), {throwOnError:false, displayMode:true}
+);
+katex.render(
+  "E_P\\big[e^{-rt}S_t\\big]=S_0e^{(\\mu-r)t}\\qquad\\Rightarrow\\qquad e^{-rt}S_t\\ \\text{is a }P\\text{-martingale only if }\\mu=r",
+  document.getElementById('eq-gbm-expect'), {throwOnError:false, displayMode:true}
+);
+katex.render(
+  "dX_t=\\mu_X(t,X_t)\\,dt+\\sigma_X(t,X_t)\\,dZ_t",
+  document.getElementById('eq-diffusion-def'), {throwOnError:false, displayMode:true}
+);
+katex.render(
+  "X_t\\text{ is a }P\\text{-martingale}\\quad\\Longrightarrow\\quad \\mu_X(t,X_t)=0\\ \\text{ for all }t,\\,X_t",
+  document.getElementById('eq-diffusion-nodrift'), {throwOnError:false, displayMode:true}
+);
+katex.render(
+  "E_P[X_s\\mid\\mathcal F_t]=X_t\\qquad\\text{for all }t<s",
+  document.getElementById('eq-mart-def'), {throwOnError:false, displayMode:true}
+);
+katex.render(
+  "Y_t=Y_0+\\int_0^t\\phi_s\\,dX_s\\qquad\\text{equivalently}\\qquad dY_t=\\phi_t\\,dX_t",
+  document.getElementById('eq-mrt'), {throwOnError:false, displayMode:true}
+);
+katex.render(
+  "dY_t=\\sigma_Y(t,Y_t)\\,dZ_t=\\underbrace{\\dfrac{\\sigma_Y(t,Y_t)}{\\sigma_X(t,X_t)}}_{\\displaystyle \\phi_t}\\,\\sigma_X(t,X_t)\\,dZ_t=\\phi_t\\,dX_t",
+  document.getElementById('eq-mrt-diffusion'), {throwOnError:false, displayMode:true}
+);
+
+/* ---------- the 5-step data ---------- */
+const steps = [
+  {
+    kicker: "STEP 1 OF 5",
+    title: "Neutralise the drift",
+    body: "First job: find that reweighting Q from engine 1. Once the discounted share price has no drift under it, that's the measure we work in for the rest of the proof — think of it as home base.",
+    eqs: [
+      {
+        note: "<strong>Start</strong> — the real-world equation for the share price. It drifts upward on average (the μ term) and wiggles randomly (the dZ_t term).",
+        tex: "dS_t = S_t\\big(\\htmlClass{glow-term}{\\mu}\\,dt+\\sigma\\,\\htmlClass{glow-term}{dZ_t}\\big)\\quad\\text{(real-world, } P\\text{)}"
+      },
+      {
+        note: "<strong>Swap</strong> — Girsanov lets us trade the real-world noise dZ_t for a new noise d\\tilde Z_t, at the cost of shifting it by θ dt.",
+        tex: "\\text{substitute}\\quad \\htmlClass{glow-term}{dZ_t} = d\\tilde Z_t-\\theta\\,dt,\\qquad \\theta=\\dfrac{\\mu-r}{\\sigma}"
+      },
+      {
+        note: "<strong>Result</strong> — same equation, but the drift is now the risk-free rate r instead of μ. Notice σ never changed — that's Girsanov's whole promise.",
+        tex: "dS_t = S_t\\big(\\htmlClass{glow-term}{r}\\,dt+\\sigma\\,\\htmlClass{glow-term}{d\\tilde Z_t}\\big)\\quad\\text{(risk-neutral, } Q\\text{)}"
+      }
+    ]
+  },
+  {
+    kicker: "STEP 2 OF 5",
+    title: "Name your price",
+    body: "Now just propose an answer: say today's price is the expected payoff under Q, discounted back to now. I want to be upfront — this is a guess at this stage, nothing more. The next three steps are what earn it.",
+    eqs: [
+      {
+        note: "<strong>The guess</strong> — today's price V_t is defined as the payoff X, averaged under Q, then discounted back from the future time T to today.",
+        tex: "\\htmlClass{glow-term}{V_t} = e^{-r(T-t)}\\,E_Q\\big[X \\mid \\mathcal F_t\\big]"
+      }
+    ]
+  },
+  {
+    kicker: "STEP 3 OF 5",
+    title: "Pull it back to time zero",
+    body: "Take that same expectation and discount it all the way back to time 0 instead of time t, and call the result E_t. Watch what happens when you check whether E_t is a martingale: the tower property lets one conditional expectation swallow the other whole, so the martingale property falls out for free — no extra assumption needed.",
+    eqs: [
+      {
+        note: "<strong>Definition</strong> — same idea as V_t, but discounted all the way back to time 0 instead of time t. Call this new quantity E_t.",
+        tex: "E_t := e^{-rT}\\,E_Q[X\\mid\\mathcal F_t]"
+      },
+      {
+        note: "<strong>Check the martingale property</strong> — write down E_t's definition one step later, at time s, then use the tower rule: an expectation of an expectation just collapses into the outer one.",
+        tex: "\\text{tower property, }t<s:\\quad E_Q[E_s\\mid\\mathcal F_t]=E_Q\\big[e^{-rT}E_Q[X\\mid\\mathcal F_s]\\,\\big|\\,\\mathcal F_t\\big]=e^{-rT}E_Q[X\\mid\\mathcal F_t]=\\htmlClass{glow-term}{E_t}"
+      },
+      {
+        note: "<strong>Payoff</strong> — the future value's expectation equals today's value. That is exactly the definition of a martingale, and we got it for free.",
+        tex: "\\Rightarrow\\quad E_Q[E_s\\mid\\mathcal F_t]=E_t \\quad\\text{so } E_t\\text{ is a }Q\\text{-martingale}"
+      },
+      {
+        note: "<strong>Bridge</strong> — line this up against Step 2's V_t, and E_t turns out to just be V_t rescaled by e^{-rt}.",
+        tex: "\\text{compare with Step 2's } V_t=e^{-r(T-t)}E_Q[X\\mid\\mathcal F_t]:\\quad \\htmlClass{glow-term}{E_t}=e^{-rt}V_t"
+      }
+    ]
+  },
+  {
+    kicker: "STEP 4 OF 5",
+    title: "Let the theorem hand you the strategy",
+    body: "This is where engine 2 earns its keep. Both the discounted price D_t and our E_t from Step 3 are driftless martingales under the same Q, driven by the same Brownian motion — so the martingale representation theorem doesn't just say a previsible φ_t exists, it tells you exactly what it looks like: the ratio of their two volatilities.",
+    eqs: [
+      {
+        note: "<strong>Second martingale</strong> — bring in the discounted stock price D_t. Step 1 already showed this is driftless under Q, so it's a martingale too.",
+        tex: "D_t := e^{-rt}S_t \\quad\\text{— the discounted price, a }Q\\text{-martingale by Step 1}"
+      },
+      {
+        note: "<strong>Both wiggle, neither drifts</strong> — since D_t and E_t are both Q-martingales, each one's SDE has no dt term at all: pure noise, no drift.",
+        tex: "dD_t=\\sigma_D(t,D_t)\\,d\\tilde Z_t,\\qquad dE_t=\\sigma_E(t,E_t)\\,d\\tilde Z_t \\quad\\text{(both driftless under }Q\\text{)}"
+      },
+      {
+        note: "<strong>The theorem's payoff</strong> — φ_t, the number of shares to hold, is just the ratio of how much each one wiggles.",
+        tex: "\\text{Engine 2:}\\quad dE_t = \\htmlClass{glow-term}{\\phi_t}\\,dD_t,\\qquad \\htmlClass{glow-term}{\\phi_t}=\\dfrac{\\sigma_E(t,E_t)}{\\sigma_D(t,D_t)}"
+      }
+    ]
+  },
+  {
+    kicker: "STEP 5 OF 5",
+    title: "Build the portfolio, check the books",
+    body: "Last move: undo the discounting from Step 3 to get back to real prices, then watch the algebra do the rest. The drift term that shows up collapses exactly into a bank-account leg — that's what \"self-financing\" looks like when you actually carry out the computation, not just assert it. Then check the payoff at maturity.",
+    eqs: [
+      {
+        note: "<strong>Undo the discounting</strong> — go back from E_t to a real, undiscounted price V_t.",
+        tex: "V_t=e^{rt}E_t \\quad\\text{— undiscount, using Step 3}"
+      },
+      {
+        note: "<strong>Differentiate</strong> — apply the product rule to that undiscounting. This picks up an extra rV_t dt term alongside the φ_t dD_t piece from Step 4.",
+        tex: "dV_t=d(e^{rt}E_t)=rV_t\\,dt+e^{rt}\\,dE_t=rV_t\\,dt+e^{rt}\\htmlClass{glow-term}{\\phi_t}\\,dD_t \\quad\\text{(Step 4)}"
+      },
+      {
+        note: "<strong>Swap back to real prices</strong> — rewrite dD_t in terms of dS_t, so everything is in tradeable shares instead of discounted units.",
+        tex: "dD_t=e^{-rt}\\big(dS_t-rS_t\\,dt\\big)\\quad\\Rightarrow\\quad e^{rt}\\phi_t\\,dD_t=\\phi_t\\,dS_t-r\\phi_t S_t\\,dt"
+      },
+      {
+        note: "<strong>Combine</strong> — the two separate drift terms merge into one clean r(V_t − φ_t S_t) dt term.",
+        tex: "dV_t=r\\big(V_t-\\phi_t S_t\\big)\\,dt+\\phi_t\\,dS_t"
+      },
+      {
+        note: "<strong>Name the leftover</strong> — whatever value isn't sitting in shares must be sitting in cash. Call that ψ_t.",
+        tex: "\\psi_t:=\\dfrac{V_t-\\phi_t S_t}{B_t}\\quad\\Rightarrow\\quad r\\big(V_t-\\phi_t S_t\\big)\\,dt=\\psi_t\\,dB_t"
+      },
+      {
+        note: "<strong>Self-financing, proven not assumed</strong> — no outside cash appears anywhere in this equation. It's exactly shares plus cash, nothing added or removed.",
+        tex: "\\htmlClass{glow-term}{dV_t}=\\phi_t\\,dS_t+\\psi_t\\,dB_t \\quad\\text{— self-financing, exactly as promised}"
+      },
+      {
+        note: "<strong>Check the finish line</strong> — at maturity, E_T is just the discounted payoff itself, so undiscounting gives back exactly X.",
+        tex: "E_T=e^{-rT}E_Q[X\\mid\\mathcal F_T]=e^{-rT}X\\quad\\Rightarrow\\quad \\htmlClass{glow-term}{V_T}=e^{rT}E_T = X"
+      }
+    ]
+  }
+];
+
+/* ---------- the 5-step accordion logic ---------- */
+const accordionEl = document.getElementById('stepsAccordion');
+
+steps.forEach((s, i) => {
+    // 1. Create the container
+    const item = document.createElement('div');
+    item.className = 'accordion-step' + (i === 0 ? ' active' : '');
+    
+    // 2. Create the clickable header
+    const header = document.createElement('div');
+    header.className = 'accordion-header';
+    header.innerHTML = `
+        <div style="display:flex; align-items:center;">
+            <span class="step-num">STEP ${i+1}</span>
+            <span class="step-name">${s.title}</span>
+        </div>
+        <span class="step-icon">+</span>
+    `;
+    
+    // 3. Create the expanding content area
+    const content = document.createElement('div');
+    content.className = 'accordion-content';
+    
+    const text = document.createElement('div');
+    text.className = 'step-body';
+    text.innerHTML = `<p>${s.body}</p>`;
+    
+    const eqsEl = document.createElement('div');
+    eqsEl.className = 'step-eqs';
+    
+    content.appendChild(text);
+    content.appendChild(eqsEl);
+    item.appendChild(header);
+    item.appendChild(content);
+    accordionEl.appendChild(item);
+    
+    // 4. Render each line as a plain-language note + its equation (hidden via CSS; revealed one by one below)
+    s.eqs.forEach(eq => {
+        const block = document.createElement('div');
+        block.className = 'eq-block';
+
+        const note = document.createElement('div');
+        note.className = 'eq-note';
+        note.innerHTML = eq.note;
+
+        const card = document.createElement('div');
+        card.className = 'eqcard eqline';
+
+        block.appendChild(note);
+        block.appendChild(card);
+        eqsEl.appendChild(block);
+        katex.render(eq.tex, card, {throwOnError:false, displayMode:true, trust:true, strict:false});
+    });
+
+    // 5. Reveal each note+equation block one at a time, glowing the terms that just changed
+    function revealLines(el, baseDelay) {
+        const blocks = el.querySelectorAll('.eq-block');
+        blocks.forEach((b, idx) => {
+            b.classList.remove('visible', 'flash');
+            setTimeout(() => {
+                b.classList.add('visible');
+                void b.offsetWidth; // trigger DOM reflow so the glow animation replays every time
+                b.classList.add('flash');
+            }, baseDelay + idx * 550);
+        });
+    }
+
+    header.addEventListener('click', () => {
+        const isActive = item.classList.contains('active');
+
+        // Close all steps and reset their equations so they replay from the top next time
+        document.querySelectorAll('.accordion-step').forEach(el => {
+            el.classList.remove('active');
+            el.querySelectorAll('.eq-block').forEach(b => b.classList.remove('flash', 'visible'));
+        });
+
+        // If the clicked one wasn't already open, open it and reveal its lines in sequence
+        if (!isActive) {
+            item.classList.add('active');
+            revealLines(item, 150);
+        }
+    });
+
+    // Reveal the first step's lines in sequence on page load
+    if (i === 0) {
+        setTimeout(() => revealLines(item, 0), 500);
+    }
+});
+
+/* ---------- delta hedging demo ---------- */
+function erf(x){
+  const sign = x < 0 ? -1 : 1; x = Math.abs(x);
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const t = 1/(1+p*x);
+  const y = 1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return sign*y;
+}
+function normCDF(x){ return 0.5*(1+erf(x/Math.SQRT2)); }
+
+const K = 100, r = 0.05;
+const rangeS = document.getElementById('rangeS');
+const rangeT = document.getElementById('rangeT');
+const rangeSig = document.getElementById('rangeSig');
+const outS = document.getElementById('outS');
+const outT = document.getElementById('outT');
+const outSig = document.getElementById('outSig');
+
+function updateDemo(){
+  const S = parseFloat(rangeS.value);
+  const T = parseFloat(rangeT.value);
+  const sig = parseFloat(rangeSig.value)/100;
+  outS.textContent = S.toFixed(0);
+  outT.textContent = T.toFixed(2);
+  outSig.textContent = (sig*100).toFixed(0)+'%';
+
+  const d1 = (Math.log(S/K) + (r + 0.5*sig*sig)*T) / (sig*Math.sqrt(T));
+  const d2 = d1 - sig*Math.sqrt(T);
+  const delta = normCDF(d1);
+  const V = S*normCDF(d1) - K*Math.exp(-r*T)*normCDF(d2);
+  const psiB = V - delta*S;
+
+  document.getElementById('outDelta').textContent = delta.toFixed(3);
+  document.getElementById('outPsi').textContent = psiB.toFixed(2);
+  document.getElementById('outV').textContent = V.toFixed(2);
+
+  const shareLeg = delta*S;
+  const total = Math.max(Math.abs(shareLeg) + Math.abs(psiB), 0.01);
+  const tealPct = Math.max(0, Math.min(100, (shareLeg/total)*100));
+  document.getElementById('barTeal').style.width = tealPct + '%';
+  document.getElementById('barMul').style.width = (100-tealPct) + '%';
+
+  const maxV = 60;
+  const vPct = Math.max(6, Math.min(100, (V/maxV)*100));
+  document.getElementById('barV').style.width = vPct + '%';
+  document.getElementById('barVLabel').textContent = 'V = ' + V.toFixed(2);
+}
+[rangeS, rangeT, rangeSig].forEach(r=> r.addEventListener('input', updateDemo));
+updateDemo();
+
+/* ---------- dividend equations ---------- */
+katex.render(
+  "S_t = S_0\\exp\\!\\Big[\\big(\\mu-\\tfrac12\\sigma^2\\big)t+\\sigma Z_t\\Big]",
+  document.getElementById('eqDivOff'), {throwOnError:false, displayMode:true}
+);
+katex.render(
+  "\\htmlClass{glow-term}{\\tilde S_t} = \\tilde S_0\\exp\\!\\Big[\\big(\\mu+\\htmlClass{glow-term}{q}-\\tfrac12\\sigma^2\\big)t+\\sigma Z_t\\Big]",
+  document.getElementById('eqDivOn'), {throwOnError:false, displayMode:true, trust:true, strict:false}
+);
+
+const divToggle = document.getElementById('divToggle');
+const panelNoDiv = document.getElementById('panelNoDiv');
+const panelDiv = document.getElementById('panelDiv');
+divToggle.addEventListener('change', ()=>{
+  if(divToggle.checked){
+    panelNoDiv.classList.remove('show');
+    panelDiv.classList.add('show');
+    panelDiv.querySelector('.eqcard').classList.remove('flash');
+    void panelDiv.offsetWidth;
+    panelDiv.querySelector('.eqcard').classList.add('flash');
+  } else {
+    panelDiv.classList.remove('show');
+    panelNoDiv.classList.add('show');
+  }
+});
+</script>
+
+<div style="position:fixed;left:0;right:0;bottom:0;z-index:9999;
+display:flex;justify-content:center;align-items:center;
+width:320px;height:50px;margin:0 auto;background:rgba(0,0,0,0.85);">
+<span style="position:absolute;top:-13px;left:0;font-size:9px;
+font-family:sans-serif;color:#aaa;background:#111;
+padding:1px 5px;border-radius:2px 2px 0 0;letter-spacing:0.5px;">Ad</span>
+
+<script>
+  if (typeof atAsyncOptions !== 'object') var atAsyncOptions = [];
+  atAsyncOptions.push({
+    key: '00244a2b0b21b7020f7519a5319093fa',
+    format: 'js',
+    async: true,
+    container: 'atContainer-00244a2b0b21b7020f7519a5319093fa',
+    params: {},
+  });
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.async = true;
+  script.src = 'https://www.highperformanceformat.com/00244a2b0b21b7020f7519a5319093fa/invoke.js';
+  document.getElementsByTagName('head')[0].appendChild(script);
+</script>
+<div id="atContainer-00244a2b0b21b7020f7519a5319093fa"></div>
+
+</div>
+<div id="ad-disclaimer" style="position:fixed;left:0;right:0;bottom:50px;z-index:9998;
+display:flex;align-items:center;justify-content:center;gap:8px;
+font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:10px;
+line-height:1.4;color:#9a9a9a;background:rgba(15,15,15,0.92);
+border-top:1px solid rgba(255,255,255,0.08);padding:3px 28px 3px 10px;">
+<span>Ads are served by our ad partner and not personally endorsed. Not liable for ad content. <a href="https://jenishestmoizavut.github.io/simulating-statistics/disclaimer.html" style="color:#8ab4f8;text-decoration:underline;">Full disclaimer</a></span>
+<button onclick="document.getElementById('ad-disclaimer').style.display='none';
+localStorage.setItem('adDisclaimerDismissed','1');"
+style="position:absolute;right:6px;background:none;border:none;color:#888;
+font-size:13px;cursor:pointer;line-height:1;padding:2px 4px;">&#10005;</button>
+</div>
+<script>
+if (localStorage.getItem('adDisclaimerDismissed') === '1') {
+  document.addEventListener('DOMContentLoaded', function() {
+    var el = document.getElementById('ad-disclaimer');
+    if (el) el.style.display = 'none';
+  });
+}
+</script>
+<div style="text-align:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif;
+font-size:10px;color:#666;padding:16px 10px 70px;">
+<a href="https://jenishestmoizavut.github.io/simulating-statistics/disclaimer.html"
+style="color:#666;text-decoration:underline;">Ad Disclaimer</a>
+</div>
+</body>
+</html>
